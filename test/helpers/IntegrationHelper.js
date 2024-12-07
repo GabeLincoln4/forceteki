@@ -17,19 +17,20 @@ const deckBuilder = new DeckBuilder();
 
 // TODO: why not just call these directly
 const ProxiedGameFlowWrapperMethods = [
+    'advancePhases',
     'allPlayersInInitiativeOrder',
-    'startGame',
+    'getPlayableCardTitles',
+    'getChatLog',
+    'getChatLogs',
+    'getPromptedPlayer',
     'keepStartingHand',
-    'skipSetupPhase',
-    'selectInitiativePlayer',
     'moveToNextActionPhase',
     'moveToRegroupPhase',
-    'advancePhases',
-    'getPromptedPlayer',
     'nextPhase',
+    'selectInitiativePlayer',
     'setDamage',
-    'getChatLogs',
-    'getChatLog'
+    'skipSetupPhase',
+    'startGame'
 ];
 
 var customMatchers = {
@@ -926,7 +927,6 @@ global.integration = function (definitions) {
                 // return all zone cards to deck and then set them below
                 this.player1.moveAllNonBaseZonesToRemoved();
                 this.player2.moveAllNonBaseZonesToRemoved();
-
 
                 if (options.phase !== 'setup') {
                     // Resources
