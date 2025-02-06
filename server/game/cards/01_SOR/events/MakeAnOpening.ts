@@ -1,6 +1,6 @@
 import AbilityHelper from '../../../AbilityHelper';
 import { EventCard } from '../../../core/card/EventCard';
-import { CardType, WildcardCardType } from '../../../core/Constants';
+import { WildcardCardType } from '../../../core/Constants';
 
 export default class MakeAnOpening extends EventCard {
     protected override getImplementationId () {
@@ -25,5 +25,3 @@ export default class MakeAnOpening extends EventCard {
         });
     }
 }
-
-MakeAnOpening.implemented = true;

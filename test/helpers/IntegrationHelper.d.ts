@@ -1,3 +1,5 @@
+type Card = import('../../server/game/core/card/Card').Card;
+type DeckBuilder = import('./DeckBuilder').DeckBuilder;
 type CardWithDamageProperty = import('../../server/game/core/card/CardTypes').CardWithDamageProperty;
 type BaseCard = import('../../server/game/core/card/BaseCard').BaseCard;
 type LeaderCard = import('../../server/game/core/card/LeaderCard').LeaderCard;
@@ -11,6 +13,11 @@ declare let integration: (definitions: ((contextRef: SwuTestContextRef) => void)
 interface SwuTestContextRef {
     context: SwuTestContext;
     setupTest: (options?: SwuSetupTestOptions) => void;
+    buildImportAllCardsTools: () => {
+        deckBuilder: DeckBuilder;
+        implementedCardsCtors: Map<string, new (owner: Player, cardData: any) => Card>;
+        unimplementedCardCtor: new (owner: Player, cardData: any) => Card;
+    };
 }
 
 interface SwuTestContext {
@@ -18,12 +25,16 @@ interface SwuTestContext {
     game: Game;
     player1Object: Player;
     player2Object: Player;
+    player1Name: string;
+    player2Name: string;
     player1: PlayerInteractionWrapper;
     player2: PlayerInteractionWrapper;
     p1Base: BaseCard;
     p1Leader: LeaderCard;
     p2Base: BaseCard;
     p2Leader: LeaderCard;
+
+    allowTestToEndWithOpenPrompt: boolean;
 
     advancePhases(endphase);
     allPlayersInInitiativeOrder(): PlayerInteractionWrapper[];
@@ -44,10 +55,16 @@ interface SwuTestContext {
     [field: string]: any;
 }
 
+interface PlayerInfo {
+    id: string;
+    username: string;
+}
+
 interface SwuSetupTestOptions {
     phase?: string;
     player1?: SwuPlayerSetupOptions;
     player2?: SwuPlayerSetupOptions;
+    autoSingleTarget?: boolean;
 
     [field: string]: any;
 }
@@ -62,6 +79,14 @@ interface SwuPlayerSetupOptions {
     hasInitiative?: boolean;
 
     [field: string]: any;
+}
+
+interface ICardDisplaySelectionState {
+    selectable?: Card[];
+    selected?: Card[];
+    unselectable?: Card[];
+    invalid?: Card[];
+    usesSelectionOrder?: boolean;
 }
 
 declare namespace jasmine {
@@ -87,9 +112,14 @@ declare namespace jasmine {
         toBeInBottomOfDeck(player: PlayerInteractionWrapper, numCards: number): boolean;
         toAllBeInBottomOfDeck(player: PlayerInteractionWrapper, numCards: number): boolean;
         toBeInZone(zone, player?: PlayerInteractionWrapper): boolean;
+        toAllBeInZone(zone, player?: PlayerInteractionWrapper): boolean;
         toBeCapturedBy(card: any): boolean;
         toHaveExactUpgradeNames(upgradeNames: any[]): boolean;
         toHaveExactPromptButtons<T extends PlayerInteractionWrapper>(this: Matchers<T>, buttons: any[]): boolean;
         toHaveExactDropdownListOptions<T extends PlayerInteractionWrapper>(this: Matchers<T>, expectedOptions: any[]): boolean;
+        toHaveExactDisplayPromptCards<T extends PlayerInteractionWrapper>(this: Matchers<T>, expectedPromptState: ICardDisplaySelectionState): boolean;
+        toHaveExactSelectableDisplayPromptCards<T extends PlayerInteractionWrapper>(this: Matchers<T>, expectedCardsInPrompt: Card[]): boolean;
+        toHaveExactViewableDisplayPromptCards<T extends PlayerInteractionWrapper>(this: Matchers<T>, expectedCardsInPrompt: Card[]): boolean;
+        toHaveExactDisplayPromptPerCardButtons<T extends PlayerInteractionWrapper>(this: Matchers<T>, expectedButtonsInPrompt: string[]): boolean;
     }
 }

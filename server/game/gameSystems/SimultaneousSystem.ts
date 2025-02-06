@@ -1,8 +1,10 @@
-import { AbilityContext } from '../core/ability/AbilityContext';
-import { GameStateChangeRequired, MetaEventName } from '../core/Constants';
-import { GameObject } from '../core/GameObject';
-import { GameSystem, IGameSystemProperties } from '../core/gameSystem/GameSystem';
-import { AggregateSystem, ISystemArrayOrFactory } from '../core/gameSystem/AggregateSystem';
+import type { AbilityContext } from '../core/ability/AbilityContext';
+import type { MetaEventName } from '../core/Constants';
+import { GameStateChangeRequired } from '../core/Constants';
+import type { GameObject } from '../core/GameObject';
+import type { GameSystem, IGameSystemProperties } from '../core/gameSystem/GameSystem';
+import type { ISystemArrayOrFactory } from '../core/gameSystem/AggregateSystem';
+import { AggregateSystem } from '../core/gameSystem/AggregateSystem';
 
 export interface ISimultaneousSystemProperties<TContext extends AbilityContext = AbilityContext> extends IGameSystemProperties {
     gameSystems: GameSystem<TContext>[];
@@ -79,7 +81,16 @@ export class SimultaneousGameSystem<TContext extends AbilityContext = AbilityCon
         }
 
         for (const gameSystem of properties.gameSystems) {
-            context.game.queueSimpleStep(queueGenerateEventGameStepsFn(gameSystem), generateStepName(gameSystem));
+            // If it's a replacement effect, just add them to events and let the ReplacementEffectSystem handle them
+            if (properties.replacementEffect === true) {
+                gameSystem.queueGenerateEventGameSteps(
+                    events,
+                    context,
+                    { ...additionalProperties, replacementEffect: true }
+                );
+            } else {
+                context.game.queueSimpleStep(queueGenerateEventGameStepsFn(gameSystem), generateStepName(gameSystem));
+            }
         }
     }
 

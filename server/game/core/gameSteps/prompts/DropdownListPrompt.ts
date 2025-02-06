@@ -1,9 +1,9 @@
-import { Card } from '../../card/Card';
-import Game from '../../Game';
-import Player from '../../Player';
-import { IPlayerPromptStateProperties } from '../../PlayerPromptState';
+import type { Card } from '../../card/Card';
+import type Game from '../../Game';
+import type Player from '../../Player';
+import type { IPlayerPromptStateProperties } from '../../PlayerPromptState';
 import * as Contract from '../../utils/Contract';
-import { IPromptPropertiesBase } from '../PromptInterfaces';
+import type { IPromptPropertiesBase } from '../PromptInterfaces';
 import { UiPrompt } from './UiPrompt';
 
 export interface IDropdownListPromptProperties extends IPromptPropertiesBase {
@@ -33,8 +33,6 @@ export class DropdownListPrompt extends UiPrompt {
         if (!properties.waitingPromptTitle) {
             properties.waitingPromptTitle = 'Waiting for opponent to choose an option for ' + properties.source.name;
         }
-
-        game.getPlayers().forEach((player) => player.clearSelectableCards());
 
         const menuTitle = 'Choose an option from the list';
 

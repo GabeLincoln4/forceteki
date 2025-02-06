@@ -1,5 +1,5 @@
 import AbilityHelper from '../../../AbilityHelper';
-import { Card } from '../../../core/card/Card';
+import type { Card } from '../../../core/card/Card';
 import { UpgradeCard } from '../../../core/card/UpgradeCard';
 import { AbilityRestriction } from '../../../core/Constants';
 
@@ -27,5 +27,3 @@ export default class FrozenInCarbonite extends UpgradeCard {
         });
     }
 }
-
-FrozenInCarbonite.implemented = true;

@@ -1,7 +1,5 @@
 import AbilityHelper from '../../../AbilityHelper';
-import { Attack } from '../../../core/attack/Attack';
 import { NonLeaderUnitCard } from '../../../core/card/NonLeaderUnitCard';
-import { Trait } from '../../../core/Constants';
 
 export default class HanSoloReluctantHero extends NonLeaderUnitCard {
     protected override getImplementationId() {
@@ -18,5 +16,3 @@ export default class HanSoloReluctantHero extends NonLeaderUnitCard {
         });
     }
 }
-
-HanSoloReluctantHero.implemented = true;

@@ -11,19 +11,13 @@ const defaultGameSettings = {
         {
             user: {
                 username: 'Order66',
+                id: 'exe66',
                 settings: {
                     optionSettings: {
-                        markCardsUnselectable: true,
-                        cancelOwnAbilities: false,
-                        orderForcedAbilities: false,
-                        confirmOneClick: false,
-                        disableCardStats: false,
-                        showStatusInSidebar: false,
-                        sortHandByName: false
+                        autoSingleTarget: true,
                     }
                 }
             },
-            id: '66',
             deck: {
                 leader: [
                     {
@@ -967,19 +961,13 @@ const defaultGameSettings = {
         {
             user: {
                 username: 'ThisIsTheWay',
+                id: 'th3w4y',
                 settings: {
                     optionSettings: {
-                        markCardsUnselectable: true,
-                        cancelOwnAbilities: false,
-                        orderForcedAbilities: false,
-                        confirmOneClick: false,
-                        disableCardStats: false,
-                        showStatusInSidebar: false,
-                        sortHandByName: false
+                        autoSingleTarget: true,
                     }
                 }
             },
-            id: 'th3w4y',
             deck: {
                 leader: [
                     {

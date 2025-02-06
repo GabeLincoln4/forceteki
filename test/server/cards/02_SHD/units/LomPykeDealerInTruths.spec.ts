@@ -10,7 +10,10 @@ describe('Lom Pyke, Dealer in Truths', function() {
                     player2: {
                         groundArena: ['wampa'],
                         spaceArena: ['cartel-spacer']
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
             });
 
@@ -52,7 +55,7 @@ describe('Lom Pyke, Dealer in Truths', function() {
 
                 expect(context.player1).toBeAbleToSelectExactly([context.cartelSpacer, context.wampa]);
                 expect(context.player1).toHavePassAbilityButton();
-                context.player1.clickPrompt('Pass ability');
+                context.player1.clickPrompt('Pass');
 
                 expect(context.cartelSpacer).toHaveExactUpgradeNames(['shield']);
                 expect(context.battlefieldMarine).toHaveExactUpgradeNames(['shield']);
@@ -99,7 +102,10 @@ describe('Lom Pyke, Dealer in Truths', function() {
                     phase: 'action',
                     player1: {
                         groundArena: ['lom-pyke#dealer-in-truths', 'battlefield-marine'],
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
             });
 
@@ -121,7 +127,10 @@ describe('Lom Pyke, Dealer in Truths', function() {
                         groundArena: ['lom-pyke#dealer-in-truths'],
                     }, player2: {
                         groundArena: ['wampa']
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
             });
 

@@ -1,7 +1,5 @@
 import AbilityHelper from '../../../AbilityHelper';
 import { EventCard } from '../../../core/card/EventCard';
-import { RelativePlayer, WildcardCardType } from '../../../core/Constants';
-import { effect } from 'zod';
 
 export default class ShootFirst extends EventCard {
     protected override getImplementationId() {
@@ -24,5 +22,3 @@ export default class ShootFirst extends EventCard {
         });
     }
 }
-
-ShootFirst.implemented = true;

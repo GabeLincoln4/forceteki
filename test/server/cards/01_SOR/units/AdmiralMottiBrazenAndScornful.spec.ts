@@ -10,7 +10,10 @@ describe('Admiral Motti', function() {
                     },
                     player2: {
                         groundArena: [{ card: 'cell-block-guard', exhausted: true }]
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
             });
 
@@ -53,7 +56,7 @@ describe('Admiral Motti', function() {
                     context.cellBlockGuard
                 ]);
 
-                context.player1.clickPrompt('Pass ability');
+                context.player1.clickPrompt('Pass');
 
                 expect(context.player2).toBeActivePlayer();
             });

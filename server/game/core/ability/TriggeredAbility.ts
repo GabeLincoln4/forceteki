@@ -1,14 +1,14 @@
 import { CardAbility } from './CardAbility';
 import { TriggeredAbilityContext } from './TriggeredAbilityContext';
-import { Stage, AbilityType, GameStateChangeRequired } from '../Constants';
-import { ITriggeredAbilityProps, WhenType } from '../../Interfaces';
-import { GameEvent } from '../event/GameEvent';
-import { Card } from '../card/Card';
-import Game from '../Game';
-import { TriggeredAbilityWindow } from '../gameSteps/abilityWindow/TriggeredAbilityWindow';
+import { AbilityType, GameStateChangeRequired, RelativePlayer, Stage } from '../Constants';
+import type { ITriggeredAbilityProps, WhenType } from '../../Interfaces';
+import type { GameEvent } from '../event/GameEvent';
+import type { Card } from '../card/Card';
+import type Game from '../Game';
+import type { TriggeredAbilityWindow } from '../gameSteps/abilityWindow/TriggeredAbilityWindow';
 import * as Contract from '../utils/Contract';
-import { CardWithTriggeredAbilities } from '../card/CardTypes';
-import { ITriggeredAbilityTargetResolver } from '../../TargetInterfaces';
+import type { CardWithTriggeredAbilities } from '../card/CardTypes';
+import type { ITriggeredAbilityTargetResolver } from '../../TargetInterfaces';
 
 interface IEventRegistration {
     name: string;
@@ -90,18 +90,35 @@ export default class TriggeredAbility extends CardAbility {
                 !this.eventsTriggeredFor.includes(event)
             ) {
                 this.eventsTriggeredFor.push(event);
-                window.addToWindow(context);
+                window.addTriggeredAbilityToWindow(context);
             }
         }
     }
 
-    public override createContext(player = this.card.controller, event: GameEvent) {
+    protected override controllerMeetsRequirements(context): boolean {
+        let controller = context.source.controller;
+
+        // If the event's card is the source of the ability, use the last known controller of the card instead of the source's controller.
+        // This is because when resolving triggered abilities like "when defeated", the defeated card is in the discard pile already
+        // and it might have changed controller.
+        if (context.event.card === context.source && context.event.lastKnownInformation) {
+            controller = context.event.lastKnownInformation.controller;
+        }
+
+        switch (this.abilityController) {
+            case RelativePlayer.Self:
+                return context.player === controller;
+            case RelativePlayer.Opponent:
+                return context.player === controller.opponent;
+            default:
+                Contract.fail(`Unexpected value for relative player: ${this.abilityController}`);
+        }
+    }
+
+    public override createContext(player = this.card.controller, event) {
         return new TriggeredAbilityContext({
-            event: event,
-            game: this.game,
-            source: this.card,
-            player: player,
-            ability: this,
+            ...super.getContextProperties(player, event),
+            event,
             stage: Stage.Trigger
         });
     }
@@ -165,7 +182,7 @@ export default class TriggeredAbility extends CardAbility {
                 this.aggregateWhen(events, context) &&
                 this.meetsRequirements(context) === ''
             ) {
-                window.addToWindow(context);
+                window.addTriggeredAbilityToWindow(context);
             }
         }
     }

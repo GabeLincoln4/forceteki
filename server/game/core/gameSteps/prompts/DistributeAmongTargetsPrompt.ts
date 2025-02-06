@@ -1,10 +1,11 @@
-import { AbilityContext } from '../../ability/AbilityContext';
-import Game from '../../Game';
-import Player from '../../Player';
-import { IPlayerPromptStateProperties } from '../../PlayerPromptState';
+import type Game from '../../Game';
+import type Player from '../../Player';
+import type { IPlayerPromptStateProperties } from '../../PlayerPromptState';
 import * as Contract from '../../utils/Contract';
-import { IDistributeAmongTargetsPromptProperties, IDistributeAmongTargetsPromptData, StatefulPromptType, IStatefulPromptResults } from '../PromptInterfaces';
+import type { IDistributeAmongTargetsPromptData, IDistributeAmongTargetsPromptProperties, IDistributeAmongTargetsPromptResults, IStatefulPromptResults } from '../PromptInterfaces';
+import { StatefulPromptType } from '../PromptInterfaces';
 import { UiPrompt } from './UiPrompt';
+import { PromptType } from '../../Constants';
 
 /**
  * Prompt for distributing healing or damage among target cards.
@@ -23,11 +24,11 @@ export class DistributeAmongTargetsPrompt extends UiPrompt {
     ) {
         super(game);
 
+        Contract.assertNonNegative(properties.amount);
+
         if (!properties.waitingPromptTitle) {
             properties.waitingPromptTitle = 'Waiting for opponent to choose targets for ' + properties.source.name;
         }
-
-        game.getPlayers().forEach((player) => player.clearSelectableCards());
 
         switch (this.properties.type) {
             case StatefulPromptType.DistributeDamage:
@@ -36,9 +37,13 @@ export class DistributeAmongTargetsPrompt extends UiPrompt {
             case StatefulPromptType.DistributeHealing:
                 this.distributeType = 'healing';
                 break;
+            case StatefulPromptType.DistributeExperience:
+                this.distributeType = 'experience';
+                break;
             default:
                 Contract.fail(`Unknown prompt type: ${this.properties.type}`);
         }
+
         let menuTitle = null;
         if (this.properties.maxTargets) {
             menuTitle = this.properties.maxTargets > 1
@@ -53,23 +58,24 @@ export class DistributeAmongTargetsPrompt extends UiPrompt {
             amount: this.properties.amount
         };
 
+        const buttons = [{ text: 'Done', arg: 'done', command: 'statefulPromptResults' }];
+        if (this.properties.canChooseNoTargets) {
+            buttons.push({ text: 'Choose no targets', arg: 'noTargets', command: '' });
+        }
+
         this._activePrompt = {
             menuTitle,
             promptTitle: this.properties.promptTitle || (this.properties.source ? this.properties.source.name : undefined),
             distributeAmongTargets: promptData,
-            buttons: this.properties.canChooseNoTargets ? [{ text: 'Choose no targets', arg: 'noTargets' }] : null,
-            promptUuid: this.uuid
+            buttons: buttons,
+            promptUuid: this.uuid,
+            promptType: PromptType.DistributeAmongTargets
         };
     }
 
-    public override continue() {
-        if (!this.isComplete()) {
-            this.player.setSelectableCards(this.properties.legalTargets);
-        } else {
-            this.complete();
-        }
-
-        return super.continue();
+    protected override highlightSelectableCards(): void {
+        this.player.setSelectableCards(this.properties.legalTargets);
+        this.player.opponent.setSelectableCards([]);
     }
 
     public override activeCondition(player) {
@@ -104,8 +110,8 @@ export class DistributeAmongTargetsPrompt extends UiPrompt {
         return true;
     }
 
-    private assertPromptResultsValid(player: Player, results: IStatefulPromptResults) {
-        Contract.assertEqual(results.type, this.properties.type, `Unexpected prompt results type, expected '${this.properties.type}' but received result of type '${results.type}'`);
+    private assertPromptResultsValid(player: Player, results: IStatefulPromptResults): asserts results is IDistributeAmongTargetsPromptResults {
+        Contract.assertTrue(results.type === this.properties.type, `Unexpected prompt results type, expected '${this.properties.type}' but received result of type '${results.type}'`);
 
         const distributedValues = Array.from(results.valueDistribution.values());
         const distributedSum = distributedValues.reduce((sum, curr) => sum + curr, 0);

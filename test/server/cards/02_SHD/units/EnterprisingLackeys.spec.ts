@@ -11,7 +11,10 @@ describe('Enterprising Lackeys', function() {
                     player2: {
                         hand: ['vanquish'],
                         hasInitiative: true,
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
             });
 
@@ -25,7 +28,7 @@ describe('Enterprising Lackeys', function() {
                 expect(context.player1).toBeAbleToSelectExactly([context.superlaserTechnician, context.battlefieldMarine, context.wildRancor, context.protector, context.devotion, context.restoredArc170]);
 
                 expect(context.player1).toHavePassAbilityButton();
-                expect(context.player1).toHaveChooseNoTargetButton();
+                expect(context.player1).not.toHaveChooseNoTargetButton();
 
                 context.player1.clickCard(context.superlaserTechnician);
 
@@ -49,9 +52,9 @@ describe('Enterprising Lackeys', function() {
                 expect(context.player1).toBeAbleToSelectExactly([context.superlaserTechnician, context.battlefieldMarine, context.wildRancor, context.protector, context.devotion, context.restoredArc170]);
 
                 expect(context.player1).toHavePassAbilityButton();
-                expect(context.player1).toHaveChooseNoTargetButton();
+                expect(context.player1).not.toHaveChooseNoTargetButton();
 
-                context.player1.clickPrompt('Pass ability');
+                context.player1.clickPrompt('Pass');
 
                 // as we pass nothing happen
                 expect(context.enterprisingLackeys).toBeInZone('discard');

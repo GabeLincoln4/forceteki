@@ -2,6 +2,8 @@ import AbilityHelper from '../../../AbilityHelper';
 import { NonLeaderUnitCard } from '../../../core/card/NonLeaderUnitCard';
 
 export default class ViperProbeDroid extends NonLeaderUnitCard {
+    protected override readonly overrideNotImplemented: boolean = true;
+
     protected override getImplementationId() {
         return {
             id: '8986035098',
@@ -13,11 +15,9 @@ export default class ViperProbeDroid extends NonLeaderUnitCard {
         this.addWhenPlayedAbility({
             title: 'Look at an opponent\'s hand.',
             immediateEffect: AbilityHelper.immediateEffects.lookAt((context) => ({
-                target: context.player.opponent.hand.sort((a, b) => a.name.localeCompare(b.name)),
-                sendChatMessage: true
+                target: context.player.opponent.hand,
+                useDisplayPrompt: true
             }))
         });
     }
 }
-
-ViperProbeDroid.implemented = true;

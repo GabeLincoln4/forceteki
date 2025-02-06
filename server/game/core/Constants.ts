@@ -65,7 +65,8 @@ export enum EffectName {
     CanAttackGroundArenaFromSpaceArena = 'canAttackGroundArenaFromSpaceArena',
     CanAttackSpaceArenaFromGroundArena = 'canAttackSpaceArenaFromGroundArena',
     CanBeTriggeredByOpponent = 'canBeTriggeredByOpponent',
-    CanPlayFromOutOfPlay = 'canPlayFromOutOfPlay',
+    CannotBeDefeatedByDamage = 'cannotBeDefeatedByDamage',
+    CanPlayFromDiscard = 'canPlayFromDiscard',
     ChangeType = 'changeType',
     CostAdjuster = 'costAdjuster',
     DelayedEffect = 'delayedEffect',
@@ -101,6 +102,7 @@ export enum Duration {
     UntilEndOfAttack = 'untilEndOfAttack',
     UntilEndOfPhase = 'untilEndOfPhase',
     UntilEndOfRound = 'untilEndOfRound',
+    WhileSourceInPlay = 'whileSourceInPlay'
 }
 
 export enum Stage {
@@ -124,6 +126,8 @@ export type RelativePlayerFilter = RelativePlayer | WildcardRelativePlayer;
 
 export enum TargetMode {
     AutoSingle = 'autoSingle',
+    // TODO: add 'Between'
+    BetweenVariable = 'betweenVariable',
     DropdownList = 'dropdownList',
     Exactly = 'exactly',
     ExactlyVariable = 'exactlyVariable',
@@ -173,10 +177,19 @@ export enum WildcardCardType {
 
 export type CardTypeFilter = CardType | WildcardCardType;
 
-export enum TokenName {
-    Shield = 'shield',
-    Experience = 'experience'
+export enum TokenUpgradeName {
+    Experience = 'experience',
+    Shield = 'shield'
 }
+
+export enum TokenUnitName {
+    BattleDroid = 'battleDroid',
+    CloneTrooper = 'cloneTrooper',
+    XWing = 'xwing',
+    TIEFighter = 'tieFighter',
+}
+
+export type TokenName = TokenUpgradeName | TokenUnitName;
 
 // TODO: start removing these if they aren't used
 export enum EventName {
@@ -187,6 +200,7 @@ export enum EventName {
     OnAttackDamageResolved = 'onAttackDamageResolved',
     OnAttackDeclared = 'onAttackDeclared',
     OnBeginRound = 'onBeginRound',
+    OnBountyCollected = 'onBountyCollected',
     OnCardAbilityInitiated = 'onCardAbilityInitiated',
     OnCardAbilityTriggered = 'onCardAbilityTriggered',
     OnCardCaptured = 'onCardCaptured',
@@ -211,6 +225,7 @@ export enum EventName {
     OnEffectApplied = 'onEffectApplied',
     OnEntireHandDiscarded = 'onEntireHandDiscarded',
     onExhaustResources = 'onExhaustResources',
+    onExploitUnits = 'onExploitUnits',
     OnInitiateAbilityEffects = 'onInitiateAbilityEffects',
     OnLeaderDeployed = 'onLeaderDeployed',
     OnLookAtCard = 'onLookAtCard',
@@ -229,9 +244,10 @@ export enum EventName {
     OnStatusTokenGained = 'onStatusTokenGained',
     OnStatusTokenMoved = 'onStatusTokenMoved',
     OnTakeControl = 'onTakeControl',
-    OnTokenCreated = 'onTokenCreated',
+    OnTokensCreated = 'OnTokensCreated',
     OnUnitEntersPlay = 'onUnitEntersPlay',
     OnUpgradeAttached = 'onUpgradeAttached',
+    OnUpgradeUnattached = 'onUpgradeUnattached',
 }
 
 /**
@@ -245,6 +261,7 @@ export enum MetaEventName {
     ChooseModalEffects = 'ChooseModalEffects',
     DistributeDamage = 'distributeDamage',
     DistributeHealing = 'distributeHealing',
+    DistributeExperience = 'distributeExperience',
     ExecuteHandler = 'executeHandler',
     InitiateAttack = 'initiateAttack',
     NoAction = 'noAction',
@@ -258,6 +275,7 @@ export enum MetaEventName {
 export enum AbilityType {
     Action = 'action',
     Constant = 'constant',
+    DelayedEffect = 'delayedEffect',
     Event = 'event',
     ReplacementEffect = 'replacementEffect',
     Triggered = 'triggered',
@@ -276,10 +294,13 @@ export enum KeywordName {
     Ambush = 'ambush',
     Bounty = 'bounty',
     Coordinate = 'coordinate',
+    Exploit = 'exploit',
     Grit = 'grit',
     Overwhelm = 'overwhelm',
     Raid = 'raid',
     Restore = 'restore',
+    /** @deprecated not implemented yet */
+    Piloting = 'piloting',
     Saboteur = 'saboteur',
     Sentinel = 'sentinel',
     Shielded = 'shielded',
@@ -328,6 +349,7 @@ export enum Trait {
     NewRepublic = 'new republic',
     Night = 'night',
     Official = 'official',
+    Pilot = 'pilot',
     Plan = 'plan',
     Rebel = 'rebel',
     Republic = 'republic',
@@ -387,10 +409,15 @@ export enum AbilityRestriction {
     Ready = 'ready',
     ReceiveDamage = 'receiveDamage',
     TriggerAbilities = 'triggerAbilities',
+    BeCaptured = 'beCaptured',
+    BeDefeated = 'beDefeated',
+    ReturnToHand = 'returnToHand',
 }
 
 export enum StateWatcherName {
     AttacksThisPhase = 'attacksThisPhase',
+    CardsDiscardedThisPhase = 'cardsDiscardedThisPhase',
+    CardsDrawnThisPhase = 'cardsDrawnThisPhase',
     CardsLeftPlayThisPhase = 'cardsLeftPlayThisPhase',
     CardsPlayedThisPhase = 'cardsPlayedThisPhase',
     UnitsDefeatedThisPhase = 'unitsDefeatedThisPhase',
@@ -404,7 +431,6 @@ export enum StateWatcherName {
     // - entered play: Boba unit
     // - attacked base: Ephant Mon, Rule with Respect
     // - attacked with unit type: Medal Ceremony, Bo-Katan leader, Asajj Ventress
-    // - discarded: Kylo's TIE Silencer
 }
 
 /** For "canAffect" and target eligibility checks, indicates whether game state must be changed by the effect in order for the check to pass */
@@ -423,4 +449,12 @@ export enum GameStateChangeRequired {
      * would be required to exhaust the full number of requested resources.
      */
     MustFullyResolve = 'mustFullyResolve',
+}
+
+export enum PromptType {
+    Initiative = 'initiative',
+    Resource = 'resource',
+    ActionWindow = 'actionWindow',
+    DisplayCards = 'displayCards',
+    DistributeAmongTargets = 'distributeAmongTargets',
 }

@@ -1,74 +1,11 @@
+const Util = require('../../server/Util.js');
 const TestSetupError = require('./TestSetupError.js');
 
-/**
- * helper for generating a list of property names and card objects to add to the test context.
- * this is so that we can access things as "this.<cardName>"
- */
-function convertNonDuplicateCardNamesToProperties(players, cardNames) {
-    let mapToPropertyNamesWithCards = (cardNames, player) => cardNames.map((cardName) =>
-        internalNameToPropertyNames(cardName).map((propertyName) => {
-            return {
-                propertyName: propertyName,
-                cardObj: player.findCardByName(cardName)
-            };
-        })
-    ).flat();
-
-    let propertyNamesWithCards = mapToPropertyNamesWithCards(cardNames[0], players[0])
-        .concat(mapToPropertyNamesWithCards(cardNames[1], players[1]));
-
-    // remove all instances of any names that are duplicated
-    propertyNamesWithCards.sort((a, b) => {
-        if (a.propertyName === b.propertyName) {
-            return 0;
-        }
-        return a.propertyName > b.propertyName ? 1 : -1;
-    });
-
-    let nonDuplicateCards = [];
-    for (let i = 0; i < propertyNamesWithCards.length; i++) {
-        if (propertyNamesWithCards[i].propertyName === propertyNamesWithCards[i - 1]?.propertyName ||
-          propertyNamesWithCards[i].propertyName === propertyNamesWithCards[i + 1]?.propertyName
-        ) {
-            continue;
-        }
-        nonDuplicateCards.push(propertyNamesWithCards[i]);
-    }
-
-    return nonDuplicateCards;
-}
-
-/** Converts an internalName into one or two property names, depending on whether there is a subtitle */
-function internalNameToPropertyNames(internalName) {
-    const [title, subtitle] = internalName.split('#');
-
-    const internalNames = subtitle ? [title, title + '-' + subtitle] : [title];
-
-    const propertyNames = [];
-    for (const internalName of internalNames) {
-        const internalNameWords = internalName.split('-');
-
-        let propertyName = internalNameWords[0];
-        if (propertyName[0] >= '0' && propertyName[0] <= '9') {
-            propertyName = '_' + propertyName;
-        }
-
-        for (const word of internalNameWords.slice(1)) {
-            const uppercasedWord = word[0].toUpperCase() + word.slice(1);
-            propertyName += uppercasedWord;
-        }
-
-        propertyNames.push(propertyName);
-    }
-
-    return propertyNames;
-}
-
 // card can be a single or an array
-function checkNullCard(card, testContext) {
+function checkNullCard(card, prefix = 'Card list contains one more null elements') {
     if (Array.isArray(card)) {
         if (card.some((cardInList) => cardInList == null)) {
-            throw new TestSetupError(`Card list contains one more null elements: ${card.map((cardInList) => getCardName(cardInList)).join(', ')}`);
+            throw new TestSetupError(`${prefix}: ${card.map((cardInList) => getCardName(cardInList)).join(', ')}`);
         }
     }
 
@@ -93,16 +30,59 @@ function formatPrompt(prompt, currentActionTargets) {
     }
 
     return (
-        prompt.menuTitle +
-        '\n' +
-        prompt.buttons.map((button) => '[ ' + button.text + (button.disabled ? ' (disabled)' : '') + ' ]').join(
-            '\n'
-        ) +
-        '\n' +
-        currentActionTargets.map((obj) => obj['name']).join('\n') +
-        '\n' +
-        createStringForOptions(prompt.dropdownListOptions)
+        prompt.menuTitle + '\n' +
+        prompt.buttons.map((button) => '[ ' + button.text + (button.disabled ? ' (disabled)' : '') + ' ]').join('\n') + '\n' +
+        formatSelectableCardsPromptData(prompt, currentActionTargets) + '\n' +
+        formatDropdownListOptions(prompt.dropdownListOptions)
     );
+}
+
+function formatSelectableCardsPromptData(prompt, currentActionTargets) {
+    if (prompt.displayCards?.length !== 0) {
+        return prompt.perCardButtons?.length === 0
+            ? formatSelectableDisplayCardsPromptData(prompt)
+            : formatPerCardButtonDisplayCardsPromptData(prompt);
+    }
+
+    if (currentActionTargets?.length !== 0) {
+        return formatCurrentActionTargets(currentActionTargets);
+    }
+
+    return '';
+}
+
+function formatCurrentActionTargets(currentActionTargets) {
+    return currentActionTargets.map((obj) => obj['name']).join('\n');
+}
+
+function formatSelectableDisplayCardsPromptData(prompt) {
+    let result = '';
+    for (const displayCard of prompt.displayCards) {
+        const selectionOrderStr = displayCard.selectionOrder ? `, selectionOrder: ${displayCard.selectionOrder}` : '';
+        result += `[${displayCard.selectionState}${selectionOrderStr}]${displayCard.internalName}\n`;
+    }
+    return result;
+}
+
+function formatPerCardButtonDisplayCardsPromptData(prompt) {
+    let result = '';
+    for (const card of prompt.displayCards) {
+        result += `${card.internalName}: ${prompt.perCardButtons.map((button) => `[${button.text}]`).join('')}\n`;
+    }
+    return result;
+}
+
+function formatBothPlayerPrompts(testContext) {
+    if (!testContext) {
+        throw new TestSetupError('Null context passed to format method');
+    }
+
+    var result = '';
+    for (const player of [testContext.player1, testContext.player2]) {
+        result += `\n******* ${player.name.toUpperCase()} PROMPT *******\n${formatPrompt(player.currentPrompt(), player.currentActionTargets)}\n`;
+    }
+
+    return result;
 }
 
 function getPlayerPromptState(player) {
@@ -114,6 +94,10 @@ function getPlayerPromptState(player) {
         menuTitle: player.currentPrompt().menuTitle,
         promptTitle: player.currentPrompt().promptTitle
     };
+}
+
+function cardNamesToString(cards) {
+    return cards.map((card) => card.internalName).join(', ');
 }
 
 function copySelectionArray(ara) {
@@ -132,43 +116,31 @@ function promptStatesEqual(promptState1, promptState2) {
         return false;
     }
 
-    return stringArraysEqual(promptState1.selectedCards, promptState2.selectedCards) &&
-      stringArraysEqual(promptState1.selectableCards, promptState2.selectableCards) &&
-      stringArraysEqual(promptState1.dropdownListOptions, promptState2.dropdownListOptions);
+    return Util.stringArraysEqual(promptState1.selectedCards, promptState2.selectedCards) &&
+      Util.stringArraysEqual(promptState1.selectableCards, promptState2.selectableCards) &&
+      Util.stringArraysEqual(promptState1.dropdownListOptions, promptState2.dropdownListOptions);
 }
 
-function stringArraysEqual(ara1, ara2) {
-    if (ara1 == null || ara2 == null) {
-        throw new TestSetupError('Null array passed to stringArraysEqual');
-    }
-
-    if (ara1.length !== ara2.length) {
-        return false;
-    }
-
-    ara1.sort();
-    ara2.sort();
-
-    for (let i = 0; i < ara1.length; i++) {
-        if (ara1[i] !== ara2[i]) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-function createStringForOptions(options) {
+function formatDropdownListOptions(options) {
     return options.length > 10 ? options.slice(0, 10).join(', ') + ', ...' : options.join(', ');
 }
 
+function isTokenUnit(cardName) {
+    return ['battle-droid', 'clone-trooper'].includes(cardName);
+}
+
+function isTokenUpgrade(cardName) {
+    return ['shield', 'experience'].includes(cardName);
+}
 
 module.exports = {
-    convertNonDuplicateCardNamesToProperties,
     checkNullCard,
     formatPrompt,
     getPlayerPromptState,
     promptStatesEqual,
-    stringArraysEqual,
-    createStringForOptions
+    formatDropdownListOptions,
+    formatBothPlayerPrompts,
+    isTokenUnit,
+    isTokenUpgrade,
+    cardNamesToString
 };

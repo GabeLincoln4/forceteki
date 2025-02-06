@@ -1,4 +1,4 @@
-describe('Take control of a card', function() {
+describe('Take control system', function() {
     integration(function(contextRef) {
         describe('When a player takes control of a unit in the arena', function() {
             beforeEach(function () {
@@ -16,7 +16,10 @@ describe('Take control of a card', function() {
                         ],
                         hand: ['strike-true', 'vanquish', 'take-captive'],
                         leader: 'finn#this-is-a-rescue'
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
 
                 const { context } = contextRef;
@@ -121,7 +124,10 @@ describe('Take control of a card', function() {
                     player2: {
                         groundArena: [{ card: 'wampa', damage: 1 }],
                         hand: ['attack-pattern-delta']
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
 
                 const { context } = contextRef;
@@ -156,7 +162,10 @@ describe('Take control of a card', function() {
                     },
                     player2: {
                         groundArena: [{ card: 'regional-sympathizers', damage: 1 }]
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
 
                 const { context } = contextRef;
@@ -182,7 +191,10 @@ describe('Take control of a card', function() {
                     },
                     player2: {
                         groundArena: [{ card: 'supreme-leader-snoke#shadow-ruler', damage: 1 }, 'specforce-soldier', 'wampa']
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
 
                 const { context } = contextRef;
@@ -215,7 +227,10 @@ describe('Take control of a card', function() {
                     },
                     player2: {
                         groundArena: [{ card: 'bail-organa#rebel-councilor', damage: 1 }, 'wampa']
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
 
                 const { context } = contextRef;
@@ -243,7 +258,10 @@ describe('Take control of a card', function() {
                     player2: {
                         leader: { card: 'emperor-palpatine#galactic-ruler', exhausted: true },
                         groundArena: [{ card: 'wampa', damage: 1 }]
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
 
                 const { context } = contextRef;
@@ -269,6 +287,46 @@ describe('Take control of a card', function() {
             });
         });
 
+        it('should update constant ability based on other unit on player board', function() {
+            contextRef.setupTest({
+                phase: 'action',
+                player1: {
+                    hand: ['traitorous', 'republic-arc170'],
+                    groundArena: ['scout-bike-pursuer'],
+                },
+                player2: {
+                    groundArena: ['battlefield-marine', 'gamorrean-retainer', 'alliance-dispatcher'],
+                },
+            });
+
+            const { context } = contextRef;
+
+            // scout bike pursuer must attack gamorrean retainer as he is sentinel
+            context.player1.clickCard(context.scoutBikePursuer);
+            expect(context.player1).toBeAbleToSelectExactly([context.gamorreanRetainer]);
+            context.player1.clickCard(context.gamorreanRetainer);
+
+            context.player2.passAction();
+
+            // steal gamorrean retainer
+            context.player1.clickCard(context.traitorous);
+            context.player1.clickCard(context.gamorreanRetainer);
+
+            // battlefield marine can attack anyone because there is no other command unit on player 1 board
+            context.player2.clickCard(context.battlefieldMarine);
+            expect(context.player2).toBeAbleToSelectExactly([context.p1Base, context.scoutBikePursuer, context.gamorreanRetainer]);
+            context.player2.clickCard(context.p1Base);
+
+            // player 1 play a command to give sentinel to gamorrean retainer
+            context.player1.clickCard(context.republicArc170);
+
+            // alliance dispatcher must attack gamorrean retainer as he is sentinel
+            context.player2.clickCard(context.allianceDispatcher);
+            context.player2.clickPrompt('Attack');
+            expect(context.player2).toBeAbleToSelectExactly([context.gamorreanRetainer]);
+            context.player2.clickCard(context.gamorreanRetainer);
+        });
+
         it('and it\'s a duplicate of another unique unit, the unique rule should be triggered to defeat one of the copies', function () {
             contextRef.setupTest({
                 phase: 'action',
@@ -278,7 +336,10 @@ describe('Take control of a card', function() {
                 },
                 player2: {
                     groundArena: [{ card: 'lom-pyke#dealer-in-truths', damage: 1 }]
-                }
+                },
+
+                // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                autoSingleTarget: true
             });
 
             const { context } = contextRef;
@@ -309,7 +370,10 @@ describe('Take control of a card', function() {
                 },
                 player2: {
                     groundArena: [{ card: 'wampa', damage: 1 }]
-                }
+                },
+
+                // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                autoSingleTarget: true
             });
 
             const { context } = contextRef;

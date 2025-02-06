@@ -9,7 +9,10 @@ describe('Bounty', function() {
                     },
                     player2: {
                         groundArena: ['wampa']
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
 
                 const { context } = contextRef;
@@ -17,8 +20,8 @@ describe('Bounty', function() {
                 context.player1.clickCard(context.hylobonEnforcer);
                 context.player1.clickCard(context.wampa);
 
-                expect(context.player2).toHavePassAbilityPrompt('Bounty: Draw a card');
-                context.player2.clickPrompt('Bounty: Draw a card');
+                expect(context.player2).toHavePassAbilityPrompt('Collect Bounty: Draw a card');
+                context.player2.clickPrompt('Collect Bounty: Draw a card');
 
                 expect(context.player1.handSize).toBe(0);
                 expect(context.player2.handSize).toBe(1);
@@ -36,7 +39,10 @@ describe('Bounty', function() {
                     },
                     player2: {
                         groundArena: ['wampa']
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
 
                 const { context } = contextRef;
@@ -57,15 +63,18 @@ describe('Bounty', function() {
                     player1: {
                         hand: ['vanquish'],
                         groundArena: ['hylobon-enforcer']
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
 
                 const { context } = contextRef;
 
                 context.player1.clickCard(context.vanquish);
 
-                expect(context.player2).toHavePassAbilityPrompt('Bounty: Draw a card');
-                context.player2.clickPrompt('Bounty: Draw a card');
+                expect(context.player2).toHavePassAbilityPrompt('Collect Bounty: Draw a card');
+                context.player2.clickPrompt('Collect Bounty: Draw a card');
 
                 expect(context.player1.handSize).toBe(0);
                 expect(context.player2.handSize).toBe(1);
@@ -80,7 +89,10 @@ describe('Bounty', function() {
                     },
                     player2: {
                         hand: ['discerning-veteran']
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
 
                 const { context } = contextRef;
@@ -91,8 +103,8 @@ describe('Bounty', function() {
                 context.player2.clickCard(context.discerningVeteran);
                 expect(context.hylobonEnforcer).toBeCapturedBy(context.discerningVeteran);
 
-                expect(context.player2).toHavePassAbilityPrompt('Bounty: Draw a card');
-                context.player2.clickPrompt('Bounty: Draw a card');
+                expect(context.player2).toHavePassAbilityPrompt('Collect Bounty: Draw a card');
+                context.player2.clickPrompt('Collect Bounty: Draw a card');
 
                 expect(context.player1.handSize).toBe(0);
                 expect(context.player2.handSize).toBe(1);
@@ -111,7 +123,10 @@ describe('Bounty', function() {
                     },
                     player2: {
                         hand: ['discerning-veteran']
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
 
                 const { context } = contextRef;
@@ -142,7 +157,10 @@ describe('Bounty', function() {
                     player2: {
                         groundArena: ['wampa', 'hylobon-enforcer'],
                         spaceArena: ['cartel-turncoat']
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
 
                 const { context } = contextRef;
@@ -169,7 +187,10 @@ describe('Bounty', function() {
                     player2: {
                         groundArena: ['hylobon-enforcer'],
                         hand: ['waylay'],
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
 
                 const { context } = contextRef;
@@ -195,7 +216,10 @@ describe('Bounty', function() {
                     },
                     player2: {
                         groundArena: ['hylobon-enforcer'],
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
 
                 // We now defeat it to check it doesn't trigger twice.
@@ -207,8 +231,8 @@ describe('Bounty', function() {
                 context.player1.clickCard(context.atst);
                 context.player1.clickCard(context.hylobonEnforcer);
 
-                expect(context.player1).toHavePassAbilityPrompt('Bounty: Draw a card');
-                context.player1.clickPrompt('Bounty: Draw a card');
+                expect(context.player1).toHavePassAbilityPrompt('Collect Bounty: Draw a card');
+                context.player1.clickPrompt('Collect Bounty: Draw a card');
 
                 expect(context.player1.handSize).toBe(1);
                 expect(context.player2.handSize).toBe(0);

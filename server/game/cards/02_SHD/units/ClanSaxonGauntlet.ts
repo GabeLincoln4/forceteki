@@ -1,6 +1,5 @@
 import AbilityHelper from '../../../AbilityHelper';
 import { NonLeaderUnitCard } from '../../../core/card/NonLeaderUnitCard';
-import * as AbilityLimit from '../../../core/ability/AbilityLimit';
 import { WildcardCardType } from '../../../core/Constants';
 
 export default class ClanSaxonGauntlet extends NonLeaderUnitCard {
@@ -25,5 +24,3 @@ export default class ClanSaxonGauntlet extends NonLeaderUnitCard {
         });
     }
 }
-
-ClanSaxonGauntlet.implemented = true;

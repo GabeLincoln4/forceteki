@@ -1,26 +1,14 @@
 const defaultWindows = {
-    dynasty: true,
-    draw: false,
-    preConflict: true,
-    conflict: true,
-    fate: false,
-    regroup: false
+    action: true,
+    regroup: true
 };
 
 const defaultOptionSettings = {
-    markCardsUnselectable: true,
-    cancelOwnAbilities: false,
-    orderForcedAbilities: false,
-    confirmOneClick: false,
-    disableCardStats: false,
-    showStatusInSidebar: false,
-    sortHandByName: false
+    autoSingleTarget: true
 };
 
 const defaultSettings = {
-    disableGravatar: false,
-    windowTimer: 10,
-    background: 'BG1'
+    windowTimer: 10
 };
 
 const defaultTimerSettings = {
@@ -32,7 +20,7 @@ interface User {
     username: string;
     email: string;
     emailHash: string;
-    _id: string;
+    id: string;
     admin: boolean;
     permissions: unknown;
     blockList: string[];
@@ -49,13 +37,7 @@ interface User {
         windowTimer: number;
         background: string;
         optionSettings: Partial<{
-            markCardsUnselectable: boolean;
-            cancelOwnAbilities: boolean;
-            orderForcedAbilities: boolean;
-            confirmOneClick: boolean;
-            disableCardStats: boolean;
-            showStatusInSidebar: boolean;
-            sortHandByName: boolean;
+            autoSingleTarget: boolean;
         }>;
         timerSettings: Partial<{
             events: boolean;
@@ -64,7 +46,7 @@ interface User {
     }>;
 }
 
-export function getUserWithDefaultsSet(user?: Partial<User> & Pick<User, 'username'>) {
+export function getUserWithDefaultsSet(user?: Partial<User> & Pick<User, 'username' | 'id'>) {
     if (!user) {
         return undefined;
     }

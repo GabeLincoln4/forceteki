@@ -1,8 +1,8 @@
 import AbilityHelper from '../../../AbilityHelper';
-import { StateWatcherRegistrar } from '../../../core/stateWatcher/StateWatcherRegistrar';
+import type { StateWatcherRegistrar } from '../../../core/stateWatcher/StateWatcherRegistrar';
 import { NonLeaderUnitCard } from '../../../core/card/NonLeaderUnitCard';
 import { WildcardCardType } from '../../../core/Constants';
-import { UnitsDefeatedThisPhaseWatcher } from '../../../stateWatchers/UnitsDefeatedThisPhaseWatcher';
+import type { UnitsDefeatedThisPhaseWatcher } from '../../../stateWatchers/UnitsDefeatedThisPhaseWatcher';
 
 export default class RuneHaakoSchemingSecond extends NonLeaderUnitCard {
     private unitsDefeatedThisPhaseWatcher: UnitsDefeatedThisPhaseWatcher;
@@ -35,5 +35,3 @@ export default class RuneHaakoSchemingSecond extends NonLeaderUnitCard {
         });
     }
 }
-
-RuneHaakoSchemingSecond.implemented = true;

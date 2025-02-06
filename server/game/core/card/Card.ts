@@ -1,29 +1,32 @@
-import { IActionAbilityProps, IConstantAbilityProps, Zone } from '../../Interfaces';
+import type { IActionAbilityProps, IConstantAbilityProps, ISetId, Zone, ITriggeredAbilityProps } from '../../Interfaces';
 import { ActionAbility } from '../ability/ActionAbility';
-import PlayerOrCardAbility from '../ability/PlayerOrCardAbility';
+import type PlayerOrCardAbility from '../ability/PlayerOrCardAbility';
 import { OngoingEffectSource } from '../ongoingEffect/OngoingEffectSource';
 import type Player from '../Player';
 import * as Contract from '../utils/Contract';
-import { AbilityRestriction, Aspect, CardType, Duration, EffectName, EventName, KeywordName, ZoneName, MoveZoneDestination, DeckZoneDestination, RelativePlayer, Trait, WildcardZoneName } from '../Constants';
+import type { MoveZoneDestination } from '../Constants';
+import { KeywordName } from '../Constants';
+import { AbilityRestriction, Aspect, CardType, Duration, EffectName, EventName, ZoneName, DeckZoneDestination, RelativePlayer, Trait, WildcardZoneName, WildcardRelativePlayer } from '../Constants';
 import * as EnumHelpers from '../utils/EnumHelpers';
-import { AbilityContext } from '../ability/AbilityContext';
-import { CardAbility } from '../ability/CardAbility';
+import type { AbilityContext } from '../ability/AbilityContext';
+import type { CardAbility } from '../ability/CardAbility';
 import type Shield from '../../cards/01_SOR/tokens/Shield';
-import { KeywordInstance, KeywordWithCostValues } from '../ability/KeywordInstance';
+import type { KeywordInstance, KeywordWithCostValues } from '../ability/KeywordInstance';
 import * as KeywordHelpers from '../ability/KeywordHelpers';
-import { StateWatcherRegistrar } from '../stateWatcher/StateWatcherRegistrar';
+import type { StateWatcherRegistrar } from '../stateWatcher/StateWatcherRegistrar';
 import type { EventCard } from './EventCard';
-import type { CardWithExhaustProperty, CardWithTriggeredAbilities, CardWithConstantAbilities, TokenCard, UnitCard, CardWithDamageProperty, TokenOrPlayableCard } from './CardTypes';
+import type { TokenCard, UnitCard, CardWithDamageProperty, TokenOrPlayableCard, CardWithCost } from './CardTypes';
 import type { UpgradeCard } from './UpgradeCard';
 import type { BaseCard } from './BaseCard';
 import type { LeaderCard } from './LeaderCard';
 import type { LeaderUnitCard } from './LeaderUnitCard';
 import type { NonLeaderUnitCard } from './NonLeaderUnitCard';
+import type { TokenUnitCard, TokenUpgradeCard } from './TokenCards';
 import type { PlayableOrDeployableCard } from './baseClasses/PlayableOrDeployableCard';
 import type { InPlayCard } from './baseClasses/InPlayCard';
 import { v4 as uuidv4 } from 'uuid';
-import { IConstantAbility } from '../ongoingEffect/IConstantAbility';
-import { CaptureZone } from '../zone/CaptureZone';
+import type { IConstantAbility } from '../ongoingEffect/IConstantAbility';
+import TriggeredAbility from '../ability/TriggeredAbility';
 
 // required for mixins to be based on this class
 export type CardConstructor = new (...args: any[]) => Card;
@@ -44,6 +47,9 @@ export class Card extends OngoingEffectSource {
     public readonly unique: boolean;
 
     protected override readonly id: string;
+    protected readonly hasNonKeywordAbilityText: boolean;
+    protected readonly hasImplementationFile: boolean;
+    protected readonly overrideNotImplemented: boolean = false;
     protected readonly printedKeywords: KeywordInstance[];
     protected readonly printedTraits: Set<Trait>;
     protected readonly printedType: CardType;
@@ -52,12 +58,13 @@ export class Card extends OngoingEffectSource {
     protected constantAbilities: IConstantAbility[] = [];
     protected _controller: Player;
     protected _facedown = true;
-    protected hasImplementationFile: boolean;   // this will be set by the ability setup methods
     protected hiddenForController = true;      // TODO: is this correct handling of hidden / visible card state? not sure how this integrates with the client
     protected hiddenForOpponent = true;
 
     private nextAbilityIdx = 0;
     private _zone: Zone;
+    protected movedFromZone?: ZoneName = null;
+    protected triggeredAbilities: TriggeredAbility[] = [];
 
 
     // ******************************************** PROPERTY GETTERS ********************************************
@@ -76,6 +83,10 @@ export class Card extends OngoingEffectSource {
     /** @deprecated use title instead**/
     public override get name() {
         return super.name;
+    }
+
+    public get setId(): ISetId {
+        return this.cardData.setId;
     }
 
     public get traits(): Set<Trait> {
@@ -106,7 +117,14 @@ export class Card extends OngoingEffectSource {
         super(owner.game, cardData.title);
 
         this.validateCardData(cardData);
-        this.validateImplementationId(cardData);
+
+        const implementationId = this.getImplementationId();
+        this.hasImplementationFile = implementationId !== null;
+        if (implementationId) {
+            this.validateImplementationId(implementationId, cardData);
+        }
+
+        this.hasNonKeywordAbilityText = this.isLeader() || this.checkHasNonKeywordAbilityText(cardData.text);
 
         this.aspects = EnumHelpers.checkConvertToEnum(cardData.aspects, Aspect);
         this.internalName = cardData.internalName;
@@ -135,12 +153,13 @@ export class Card extends OngoingEffectSource {
     public getActionAbilities(): ActionAbility[] {
         const deduplicatedActionAbilities: ActionAbility[] = [];
 
+        // Add any gained action abilities, deduplicating by any identical gained action abilities from
+        // the same source card (e.g., two Heroic Resolve actions)
         const seenCardNameSources = new Set<string>();
         for (const action of this.actionAbilities) {
             if (action.printedAbility) {
                 deduplicatedActionAbilities.push(action);
             } else if (!seenCardNameSources.has(action.gainAbilitySource.internalName)) {
-                // Deduplicate any identical gained action abilities from the same source card (e.g., two Heroic Resolve actions)
                 deduplicatedActionAbilities.push(action);
                 seenCardNameSources.add(action.gainAbilitySource.internalName);
             }
@@ -214,14 +233,11 @@ export class Card extends OngoingEffectSource {
     /**
      * If this is a subclass implementation of a specific card, validate that it matches the provided card data
      */
-    private validateImplementationId(cardData: any): void {
-        const implementationId = this.getImplementationId();
-        if (implementationId) {
-            if (cardData.id !== implementationId.id || cardData.internalName !== implementationId.internalName) {
-                throw new Error(
-                    `Provided card data { ${cardData.id}, ${cardData.internalName} } does not match the data from the card class: { ${implementationId.id}, ${implementationId.internalName} }. Confirm that you are matching the card data to the right card implementation class.`
-                );
-            }
+    private validateImplementationId(implementationId: { internalName: string; id: string }, cardData: any): void {
+        if (cardData.id !== implementationId.id || cardData.internalName !== implementationId.internalName) {
+            throw new Error(
+                `Provided card data { ${cardData.id}, ${cardData.internalName} } does not match the data from the card class: { ${implementationId.id}, ${implementationId.internalName} }. Confirm that you are matching the card data to the right card implementation class.`
+            );
         }
     }
 
@@ -231,6 +247,34 @@ export class Card extends OngoingEffectSource {
      */
     protected getImplementationId(): null | { internalName: string; id: string } {
         return null;
+    }
+
+    private checkHasNonKeywordAbilityText(abilityText?: string) {
+        if (abilityText == null) {
+            return false;
+        }
+
+        const abilityLines = abilityText.split('\n');
+
+        // bounty and coordinate keywords always require explicit implementation so we omit them from here
+        const keywords = Object.values(KeywordName)
+            .filter((keyword) => keyword !== KeywordName.Bounty && keyword !== KeywordName.Coordinate);
+
+        for (const abilityLine of abilityLines) {
+            if (abilityLine.trim().length === 0) {
+                continue;
+            }
+
+            const lowerCaseAbilityLine = abilityLine.toLowerCase();
+
+            if (keywords.some((keyword) => lowerCaseAbilityLine.startsWith(keyword))) {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     protected unpackConstructorArgs(...args: any[]): [Player, any] {
@@ -258,6 +302,10 @@ export class Card extends OngoingEffectSource {
             ...this.buildGeneralAbilityProps('constant'),
             uuid: uuidv4()
         };
+    }
+
+    protected createTriggeredAbility<TSource extends Card = this>(properties: ITriggeredAbilityProps<TSource>): TriggeredAbility {
+        return new TriggeredAbility(this.game, this, Object.assign(this.buildGeneralAbilityProps('triggered'), properties));
     }
 
     protected buildGeneralAbilityProps(abilityTypeDescriptor: string) {
@@ -309,6 +357,14 @@ export class Card extends OngoingEffectSource {
         return this.type === CardType.TokenUnit || this.type === CardType.TokenUpgrade;
     }
 
+    public isTokenUnit(): this is TokenUnitCard {
+        return this.type === CardType.TokenUnit;
+    }
+
+    public isTokenUpgrade(): this is TokenUpgradeCard {
+        return this.type === CardType.TokenUpgrade;
+    }
+
     public isShield(): this is Shield {
         return false;
     }
@@ -331,6 +387,10 @@ export class Card extends OngoingEffectSource {
         return false;
     }
 
+    public hasCost(): this is CardWithCost {
+        return false;
+    }
+
     /**
      * Returns true if the card is in a playable card (not deployable) or a token
      */
@@ -342,15 +402,7 @@ export class Card extends OngoingEffectSource {
      * Returns true if the card is a type that can legally have triggered abilities.
      * The returned type set is equivalent to {@link CardWithTriggeredAbilities}.
      */
-    public canRegisterTriggeredAbilities(): this is InPlayCard {
-        return false;
-    }
-
-    /**
-     * Returns true if the card is a type that can legally have constant abilities.
-     * The returned type set is equivalent to {@link CardWithConstantAbilities}.
-     */
-    public canRegisterConstantAbilities(): this is InPlayCard {
+    public canRegisterTriggeredAbilities(): this is InPlayCard | BaseCard {
         return false;
     }
 
@@ -376,10 +428,13 @@ export class Card extends OngoingEffectSource {
         return keywordInstances;
     }
 
-    public getKeywordWithCostValues(keywordName: KeywordName): KeywordWithCostValues {
-        const keyword = this.getKeywords().find((keyword) => keyword.valueOf() === keywordName);
-        Contract.assertTrue(keyword.hasCostValue(), `Keyword ${keywordName} does not have cost values.`);
-        return keyword as KeywordWithCostValues;
+    public getKeywordsWithCostValues(keywordName: KeywordName): KeywordWithCostValues[] {
+        const keywords = this.getKeywords().filter((keyword) => keyword.valueOf() === keywordName);
+
+        const keywordsWithoutCostValues = keywords.filter((keyword) => !keyword.hasCostValue());
+        Contract.assertTrue(keywordsWithoutCostValues.length === 0, 'Found at least one keyword with missing cost values');
+
+        return keywords as KeywordWithCostValues[];
     }
 
     public hasSomeKeyword(keywords: Set<KeywordName> | KeywordName | KeywordName[]): boolean {
@@ -446,27 +501,32 @@ export class Card extends OngoingEffectSource {
     /**
      * Moves a card to a new zone, optionally resetting the card's controller back to its owner.
      *
-     * @param targetZone Zone to move to
-     * @param resetController If true (default behavior), sets `card.controller = card.owner` on move. Set to
-     * false for a hypothetical situation where a controlled opponent unit is being moved between zones and
-     * needs to not change hands back to the owner.
+     * @param targetZoneName Zone to move to
      */
-    public moveTo(targetZone: MoveZoneDestination, resetController = true) {
+    public moveTo(targetZoneName: MoveZoneDestination) {
         Contract.assertNotNullLike(this._zone, `Attempting to move card ${this.internalName} before initializing zone`);
 
-        const originalZone = this.zoneName;
-        if (originalZone === targetZone) {
-            return;
+        const prevZone = this.zoneName;
+        const resetController = EnumHelpers.zoneMoveRequiresControllerReset(prevZone, targetZoneName);
+
+        // if we're moving to deck top / bottom, don't bother checking if we're already in the zone
+        if (!([DeckZoneDestination.DeckBottom, DeckZoneDestination.DeckTop] as MoveZoneDestination[]).includes(targetZoneName)) {
+            const originalZone = this._zone;
+            const moveToZone = (resetController ? this.owner : this.controller)
+                .getZone(EnumHelpers.asConcreteZone(targetZoneName));
+
+            if (originalZone === moveToZone) {
+                return;
+            }
         }
 
-        const prevZone = this.zoneName;
         this.removeFromCurrentZone();
 
         if (resetController) {
             this._controller = this.owner;
         }
 
-        this.addSelfToZone(targetZone);
+        this.addSelfToZone(targetZoneName);
 
         this.postMoveSteps(prevZone);
     }
@@ -570,8 +630,59 @@ export class Card extends OngoingEffectSource {
      * Updates the card's abilities for its current zone after being moved.
      * Called from {@link Game.resolveGameState} after event resolution.
      */
+
+    public resolveAbilitiesForNewZone() {
+        // TODO: do we need to consider a case where a card is moved from one arena to another,
+        // where we maybe wouldn't reset events / effects / limits?
+        this.updateTriggeredAbilityEvents(this.movedFromZone, this.zoneName);
+        this.updateConstantAbilityEffects(this.movedFromZone, this.zoneName);
+        this.updateKeywordAbilityEffects(this.movedFromZone, this.zoneName);
+
+        this.movedFromZone = null;
+    }
+
+    private updateTriggeredAbilityEvents(from: ZoneName, to: ZoneName, reset: boolean = true) {
+        if (!EnumHelpers.isArena(from) && !EnumHelpers.isArena(to)) {
+            this.resetLimits();
+        }
+
+        for (const triggeredAbility of this.triggeredAbilities) {
+            if (EnumHelpers.cardZoneMatches(to, triggeredAbility.zoneFilter) && !EnumHelpers.cardZoneMatches(from, triggeredAbility.zoneFilter)) {
+                triggeredAbility.registerEvents();
+            } else if (!EnumHelpers.cardZoneMatches(to, triggeredAbility.zoneFilter) && EnumHelpers.cardZoneMatches(from, triggeredAbility.zoneFilter)) {
+                triggeredAbility.unregisterEvents();
+            }
+        }
+    }
+
+    private updateConstantAbilityEffects(from: ZoneName, to: ZoneName) {
+        if (!EnumHelpers.isArena(to) || from === ZoneName.Discard || from === ZoneName.Capture) {
+            this.removeLastingEffects();
+        }
+
+        for (const constantAbility of this.constantAbilities) {
+            if (constantAbility.sourceZoneFilter === WildcardZoneName.Any) {
+                continue;
+            }
+            if (
+                !EnumHelpers.cardZoneMatches(from, constantAbility.sourceZoneFilter) &&
+                EnumHelpers.cardZoneMatches(to, constantAbility.sourceZoneFilter)
+            ) {
+                constantAbility.registeredEffects = this.addEffectToEngine(constantAbility);
+            } else if (
+                EnumHelpers.cardZoneMatches(from, constantAbility.sourceZoneFilter) &&
+                !EnumHelpers.cardZoneMatches(to, constantAbility.sourceZoneFilter)
+            ) {
+                this.removeEffectFromEngine(constantAbility.registeredEffects);
+                constantAbility.registeredEffects = [];
+            }
+        }
+    }
+
+    /** Register / un-register the effects for any abilities from keywords */
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    public resolveAbilitiesForNewZone() {}
+    protected updateKeywordAbilityEffects(from: ZoneName, to: ZoneName) { }
+
 
     /**
      * Deals with the engine effects of entering a new zone, making sure all statuses are set with legal values.
@@ -581,7 +692,7 @@ export class Card extends OngoingEffectSource {
      * Subclass methods should override this and call the super method to ensure all statuses are set correctly.
      */
     protected initializeForCurrentZone(prevZone?: ZoneName) {
-        this.hiddenForOpponent = EnumHelpers.isHidden(this.zoneName, RelativePlayer.Self);
+        this.hiddenForOpponent = EnumHelpers.isHiddenFromOpponent(this.zoneName, RelativePlayer.Self);
 
         switch (this.zoneName) {
             case ZoneName.SpaceArena:
@@ -627,15 +738,19 @@ export class Card extends OngoingEffectSource {
     }
 
     // ******************************************* MISC *******************************************
-    protected assertPropertyEnabled(propertyVal: any, propertyName: string) {
-        Contract.assertNotNullLike(propertyVal, this.buildPropertyDisabledStr(propertyName));
+    public override isCard(): this is Card {
+        return true;
     }
 
-    protected assertPropertyEnabledBoolean(enabled: boolean, propertyName: string) {
-        Contract.assertTrue(enabled, this.buildPropertyDisabledStr(propertyName));
+    protected assertPropertyEnabledForZone(propertyVal: any, propertyName: string) {
+        Contract.assertNotNullLike(propertyVal, this.buildPropertyDisabledForZoneStr(propertyName));
     }
 
-    private buildPropertyDisabledStr(propertyName: string) {
+    protected assertPropertyEnabledForZoneBoolean(enabled: boolean, propertyName: string) {
+        Contract.assertTrue(enabled, this.buildPropertyDisabledForZoneStr(propertyName));
+    }
+
+    private buildPropertyDisabledForZoneStr(propertyName: string) {
         return `Attempting to read property '${propertyName}' on '${this.internalName}' but it is in zone '${this.zoneName}' where the property does not apply`;
     }
 
@@ -766,19 +881,15 @@ export class Card extends OngoingEffectSource {
     * This is the infomation for each card that is sent to the client.
     */
 
-    public getSummary(activePlayer, hideWhenFaceup) {
+    public getSummary(activePlayer: Player): any {
         const isActivePlayer = activePlayer === this.controller;
         const selectionState = activePlayer.getCardSelectionState(this);
 
-        // This is my facedown card, but I'm not allowed to look at it
-        // OR This is not my card, and it's either facedown or hidden from me
-        if (
-            isActivePlayer
-                ? this.facedown
-                : this.facedown || hideWhenFaceup
-        ) {
+        // If it is not the active player and in opposing hand or deck - return facedown card
+        if (this._zone.hiddenForPlayers === WildcardRelativePlayer.Any || (!isActivePlayer && this._zone.hiddenForPlayers === RelativePlayer.Opponent)) {
             const state = {
                 controller: this.controller.getShortSummary(),
+                owner: this.owner.getShortSummary(),
                 // menu: isActivePlayer ? this.getMenu() : undefined,
                 facedown: true,
                 zone: this.zoneName,
@@ -790,8 +901,11 @@ export class Card extends OngoingEffectSource {
 
         const state = {
             id: this.cardData.id,
-            setId: this.cardData.setId,
+            setId: this.setId,
             controlled: this.owner !== this.controller,
+            controller: this.controller.getShortSummary(),
+            owner: this.owner.getShortSummary(),
+            aspects: this.aspects,
             // facedown: this.isFacedown(),
             zone: this.zoneName,
             // menu: this.getMenu(),
@@ -799,6 +913,7 @@ export class Card extends OngoingEffectSource {
             cost: this.cardData.cost,
             power: this.cardData.power,
             hp: this.cardData.hp,
+            implemented: !this.overrideNotImplemented && (!this.hasNonKeywordAbilityText || this.hasImplementationFile),  // we consider a card "implemented" if it doesn't require any implementation
             // popupMenuText: this.popupMenuText,
             // showPopup: this.showPopup,
             // tokens: this.tokens,
@@ -827,5 +942,9 @@ export class Card extends OngoingEffectSource {
                 Contract.fail(`Unknown player: ${player}`);
                 return false;
         }
+    }
+
+    public override toString() {
+        return this.internalName;
     }
 }

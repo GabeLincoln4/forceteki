@@ -1,8 +1,10 @@
 import AbilityHelper from '../../../AbilityHelper';
 import { EventCard } from '../../../core/card/EventCard';
-import { RelativePlayer, WildcardCardType, WildcardRelativePlayer } from '../../../core/Constants';
+import { WildcardCardType, WildcardRelativePlayer } from '../../../core/Constants';
 
 export default class MidnightRepairs extends EventCard {
+    protected override readonly overrideNotImplemented: boolean = true;
+
     protected override getImplementationId () {
         return {
             id: '8818201543',
@@ -22,5 +24,3 @@ export default class MidnightRepairs extends EventCard {
         });
     }
 }
-
-MidnightRepairs.implemented = true;

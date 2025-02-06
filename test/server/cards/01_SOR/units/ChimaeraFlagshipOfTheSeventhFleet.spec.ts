@@ -9,7 +9,10 @@ describe('Chimaera, Flagship of the Seventh Fleet', function () {
                     },
                     player2: {
                         hand: ['vanquish', 'millennium-falcon#piece-of-junk', 'millennium-falcon#landos-pride', 'wampa']
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
 
                 const { context } = contextRef;
@@ -20,7 +23,7 @@ describe('Chimaera, Flagship of the Seventh Fleet', function () {
                 context.player1.clickCard(context.chimaera);
                 expect(context.player1).toHaveExactDropdownListOptions(context.getPlayableCardTitles());
                 context.player1.chooseListOption('Millennium Falcon');
-                expect(context.getChatLogs(1)).toContain('player1 reveals Wampa, Millennium Falcon, Millennium Falcon, Vanquish due to Chimaera');
+                expect(context.getChatLogs(1)).toContain('player1 reveals Vanquish, Millennium Falcon, Millennium Falcon, Wampa due to Chimaera');
                 expect(context.player2).toBeAbleToSelectExactly([falcon1, falcon2]);
                 context.player2.clickCard(falcon1);
 
@@ -40,7 +43,10 @@ describe('Chimaera, Flagship of the Seventh Fleet', function () {
                     },
                     player2: {
                         hand: ['vanquish', 'millennium-falcon#piece-of-junk', 'millennium-falcon#landos-pride', 'wampa']
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
 
                 const { context } = contextRef;
@@ -51,7 +57,7 @@ describe('Chimaera, Flagship of the Seventh Fleet', function () {
                 context.player1.clickCard(context.chimaera);
                 expect(context.player1).toHaveExactDropdownListOptions(context.getPlayableCardTitles());
                 context.player1.chooseListOption('Wampa');
-                expect(context.getChatLogs(1)).toContain('player1 reveals Wampa, Millennium Falcon, Millennium Falcon, Vanquish due to Chimaera');
+                expect(context.getChatLogs(1)).toContain('player1 reveals Vanquish, Millennium Falcon, Millennium Falcon, Wampa due to Chimaera');
 
                 expect(falcon1).toBeInZone('hand');
                 expect(falcon2).toBeInZone('hand');
@@ -69,7 +75,10 @@ describe('Chimaera, Flagship of the Seventh Fleet', function () {
                     },
                     player2: {
                         hand: ['vanquish', 'millennium-falcon#piece-of-junk', 'millennium-falcon#landos-pride', 'wampa']
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
 
                 const { context } = contextRef;
@@ -80,7 +89,7 @@ describe('Chimaera, Flagship of the Seventh Fleet', function () {
                 context.player1.clickCard(context.chimaera);
                 expect(context.player1).toHaveExactDropdownListOptions(context.getPlayableCardTitles());
                 context.player1.chooseListOption('Resupply');
-                expect(context.getChatLogs(1)).toContain('player1 reveals Wampa, Millennium Falcon, Millennium Falcon, Vanquish due to Chimaera');
+                expect(context.getChatLogs(1)).toContain('player1 reveals Vanquish, Millennium Falcon, Millennium Falcon, Wampa due to Chimaera');
 
                 expect(falcon1).toBeInZone('hand');
                 expect(falcon2).toBeInZone('hand');

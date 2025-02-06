@@ -1,6 +1,6 @@
 const EventEmitter = require('events');
+const seedrandom = require('seedrandom');
 
-const ChatCommands = require('./chat/ChatCommands.js');
 const { GameChat } = require('./chat/GameChat.js');
 const { OngoingEffectEngine } = require('./ongoingEffect/OngoingEffectEngine.js');
 const Player = require('./Player.js');
@@ -13,13 +13,10 @@ const { RegroupPhase } = require('./gameSteps/phases/RegroupPhase.js');
 const { SimpleStep } = require('./gameSteps/SimpleStep.js');
 const MenuPrompt = require('./gameSteps/prompts/MenuPrompt.js');
 const HandlerMenuPrompt = require('./gameSteps/prompts/HandlerMenuPrompt.js');
-const SelectCardPrompt = require('./gameSteps/prompts/SelectCardPrompt.js');
 const GameOverPrompt = require('./gameSteps/prompts/GameOverPrompt.js');
 const GameSystems = require('../gameSystems/GameSystemLibrary.js');
 const { GameEvent } = require('./event/GameEvent.js');
-const InitiateCardAbilityEvent = require('./event/InitiateCardAbilityEvent.js');
 const { EventWindow, TriggerHandlingMode } = require('./event/EventWindow');
-const InitiateAbilityEventWindow = require('./gameSteps/abilityWindow/InitiateAbilityEventWindow.js');
 const AbilityResolver = require('./gameSteps/AbilityResolver.js');
 const { AbilityContext } = require('./ability/AbilityContext.js');
 const Contract = require('./utils/Contract.js');
@@ -28,9 +25,7 @@ const { cards } = require('../cards/Index.js');
 // const ConflictFlow = require('./gamesteps/conflict/conflictflow');
 // const MenuCommands = require('./MenuCommands');
 
-const { EventName, ZoneName, TokenName, Trait, WildcardZoneName } = require('./Constants.js');
-const { BaseStepWithPipeline } = require('./gameSteps/BaseStepWithPipeline.js');
-const { default: Shield } = require('../cards/01_SOR/tokens/Shield.js');
+const { EventName, ZoneName, Trait, WildcardZoneName, TokenUpgradeName, TokenUnitName } = require('./Constants.js');
 const { StateWatcherRegistrar } = require('./stateWatcher/StateWatcherRegistrar.js');
 const { DistributeAmongTargetsPrompt } = require('./gameSteps/prompts/DistributeAmongTargetsPrompt.js');
 const HandlerMenuMultipleSelectionPrompt = require('./gameSteps/prompts/HandlerMenuMultipleSelectionPrompt.js');
@@ -41,6 +36,10 @@ const { GroundArenaZone } = require('./zone/GroundArenaZone.js');
 const { SpaceArenaZone } = require('./zone/SpaceArenaZone.js');
 const { AllArenasZone } = require('./zone/AllArenasZone.js');
 const EnumHelpers = require('./utils/EnumHelpers.js');
+const { SelectCardPrompt } = require('./gameSteps/prompts/SelectCardPrompt.js');
+const { DisplayCardsWithButtonsPrompt } = require('./gameSteps/prompts/DisplayCardsWithButtonsPrompt.js');
+const { DisplayCardsForSelectionPrompt } = require('./gameSteps/prompts/DisplayCardsForSelectionPrompt.js');
+const { DisplayCardsBasicPrompt } = require('./gameSteps/prompts/DisplayCardsBasicPrompt.js');
 
 class Game extends EventEmitter {
     constructor(details, options = {}) {
@@ -49,7 +48,6 @@ class Game extends EventEmitter {
         this.ongoingEffectEngine = new OngoingEffectEngine(this);
         this.playersAndSpectators = {};
         this.gameChat = new GameChat();
-        this.chatCommands = new ChatCommands(this);
         this.pipeline = new GamePipeline();
         this.id = details.id;
         this.name = details.name;
@@ -61,7 +59,6 @@ class Game extends EventEmitter {
         this.createdAt = new Date();
         // this.savedGameId = details.savedGameId;
         // this.gameType = details.gameType;
-        this.currentAbilityWindow = null;
         this.currentActionWindow = null;
         this.currentEventWindow = null;
         this.currentAttack = null;
@@ -78,6 +75,10 @@ class Game extends EventEmitter {
         this.tokenFactories = null;
         this.stateWatcherRegistrar = new StateWatcherRegistrar(this);
         this.movedCards = [];
+        this.randomGenerator = seedrandom();
+
+        /** @type {import('../Interfaces').IClientUIProperties} */
+        this.clientUIProperties = {};
 
         this.registerGlobalRulesListeners();
 
@@ -87,17 +88,17 @@ class Game extends EventEmitter {
         Contract.assertArraySize(details.players, 2, 'Game must have exactly 2 players');
 
         details.players.forEach((player) => {
-            this.playersAndSpectators[player.user.username] = new Player(
-                player.id,
+            this.playersAndSpectators[player.user.id] = new Player(
+                player.user.id,
                 player.user,
-                this.owner === player.user.username,
+                this.owner === player.user.id,
                 this,
                 details.clocks
             );
         });
 
         details.spectators?.forEach((spectator) => {
-            this.playersAndSpectators[spectator.user.username] = new Spectator(spectator.id, spectator.user);
+            this.playersAndSpectators[spectator.user.id] = new Spectator(spectator.id, spectator.user);
         });
 
         const [player1, player2] = this.getPlayers();
@@ -165,6 +166,16 @@ class Game extends EventEmitter {
     }
 
     /**
+     * Get all players currently captured cards
+     * @param {Player} player
+     * @returns {Array}
+     */
+    getAllCapturedCards(player) {
+        return this.findAnyCardsInPlay((card) => card.isUnit() && card.owner === player)
+            .flatMap((card) => card.capturedUnits);
+    }
+
+    /**
      * Get all players (not spectators) in the game
      * @returns {Player[]}
      */
@@ -178,10 +189,20 @@ class Game extends EventEmitter {
      * @returns {Player}
      */
     getPlayerByName(playerName) {
-        Contract.assertHasProperty(this.playersAndSpectators, playerName);
+        const player = this.getPlayers().find((player) => player.name === playerName);
+        if (player) {
+            return player;
+        }
 
-        let player = this.playersAndSpectators[playerName];
-        Contract.assertFalse(this.isSpectator(player), `Player ${playerName} is a spectator`);
+        throw new Error(`Player with name ${playerName} not found`);
+    }
+
+    getPlayerById(playerId) {
+        Contract.assertHasProperty(this.playersAndSpectators, playerId);
+
+        let player = this.playersAndSpectators[playerId];
+        Contract.assertFalse(this.isSpectator(player), `Player ${player.name} is a spectator`);
+        Contract.assertNotNullLike(player, `Player with id ${playerId} not found`);
 
         return player;
     }
@@ -223,6 +244,7 @@ class Game extends EventEmitter {
         return otherPlayer;
     }
 
+
     registerGlobalRulesListeners() {
         UnitPropertiesCard.registerRulesListeners(this);
     }
@@ -246,6 +268,10 @@ class Game extends EventEmitter {
         }
 
         // by default, if the opponent has passed and the active player has not, they remain the active player and play continues
+    }
+
+    setRandomSeed(seed) {
+        this.randomGenerator = seedrandom(seed);
     }
 
     /**
@@ -380,11 +406,11 @@ class Game extends EventEmitter {
     // TODO: parameter contract checks for this flow
     /**
      * This function is called from the client whenever a card is clicked
-     * @param {String} sourcePlayer - name of the clicking player
+     * @param {String} sourcePlayerId - id of the clicking player
      * @param {String} cardId - uuid of the card clicked
      */
-    cardClicked(sourcePlayer, cardId) {
-        var player = this.getPlayerByName(sourcePlayer);
+    cardClicked(sourcePlayerId, cardId) {
+        var player = this.getPlayerById(sourcePlayerId);
 
         if (!player) {
             return;
@@ -487,30 +513,38 @@ class Game extends EventEmitter {
             return;
         }
 
+        /**
+         * TODO we currently set the winner here as to send the winner via gameState.
+         * TODO this will likely change when we decide on how the popup will look like seperately
+         * TODO from the preference popup
+         */
         if (Array.isArray(winner)) {
+            this.winner = winner.map((w) => w.name);
             this.addMessage('The game ends in a draw');
         } else {
+            this.winner = [winner.name];
             this.addMessage('{0} has won the game', winner);
         }
-        this.winner = winner;
-
-
         this.finishedAt = new Date();
         this.gameEndReason = reason;
-
-        this.router.gameWon(this, reason, winner);
-
-        this.queueStep(new GameOverPrompt(this, winner));
+        // this.router.gameWon(this, reason, winner);
+        // TODO Tests failed since this.router doesn't exist for them we use an if statement to unblock.
+        // TODO maybe later on we could have a check here if the environment test?
+        if (typeof this.router.sendGameState === 'function') {
+            this.router.sendGameState(this); // call the function if it exists
+        } else {
+            this.queueStep(new GameOverPrompt(this, winner));
+        }
     }
 
     /**
      * Changes a Player variable and displays a message in chat
-     * @param {String} playerName
+     * @param {String} playerId
      * @param {String} stat
      * @param {Number} value
      */
-    changeStat(playerName, stat, value) {
-        var player = this.getPlayerByName(playerName);
+    changeStat(playerId, stat, value) {
+        var player = this.getPlayerById(playerId);
         if (!player) {
             return;
         }
@@ -563,10 +597,10 @@ class Game extends EventEmitter {
 
     /**
      * This is called by the client when a player clicks 'Concede'
-     * @param {String} playerName
+     * @param {String} playerId
      */
-    concede(playerName) {
-        var player = this.getPlayerByName(playerName);
+    concede(playerId) {
+        var player = this.getPlayerByName(playerId);
 
         if (!player) {
             return;
@@ -581,8 +615,8 @@ class Game extends EventEmitter {
         }
     }
 
-    selectDeck(playerName, deck) {
-        let player = this.getPlayerByName(playerName);
+    selectDeck(playerId, deck) {
+        let player = this.getPlayerById(playerId);
         if (player) {
             player.selectDeck(deck);
         }
@@ -591,11 +625,11 @@ class Game extends EventEmitter {
     /**
      * Called when a player clicks Shuffle Deck on the conflict deck menu in
      * the client
-     * @param {String} playerName
+     * @param {String} playerId
      * @param {AbilityContext} context
      */
-    shuffleDeck(playerName, context = null) {
-        let player = this.getPlayerByName(playerName);
+    shuffleDeck(playerId, context = null) {
+        let player = this.getPlayerById(playerId);
         if (player) {
             player.shuffleDeck(context);
         }
@@ -629,6 +663,36 @@ class Game extends EventEmitter {
     }
 
     /**
+     *  @param {Player} player
+     *  @param {import('./gameSteps/PromptInterfaces.js').IDisplayCardsWithButtonsPromptProperties} properties
+     */
+    promptDisplayCardsWithButtons(player, properties) {
+        Contract.assertNotNullLike(player);
+
+        this.queueStep(new DisplayCardsWithButtonsPrompt(this, player, properties));
+    }
+
+    /**
+     *  @param {Player} player
+     *  @param {import('./gameSteps/PromptInterfaces.js').IDisplayCardsSelectProperties} properties
+     */
+    promptDisplayCardsForSelection(player, properties) {
+        Contract.assertNotNullLike(player);
+
+        this.queueStep(new DisplayCardsForSelectionPrompt(this, player, properties));
+    }
+
+    /**
+     *  @param {Player} player
+     *  @param {import('./gameSteps/PromptInterfaces.js').IDisplayCardsBasicPromptProperties} properties
+     */
+    promptDisplayCardsBasic(player, properties) {
+        Contract.assertNotNullLike(player);
+
+        this.queueStep(new DisplayCardsBasicPrompt(this, player, properties));
+    }
+
+    /**
      * Prompts a player with a menu for selecting a string from a list of options
      * @param {Player} player
      * @param {import('./gameSteps/prompts/DropdownListPrompt.js').IDropdownListPromptProperties} properties
@@ -642,7 +706,7 @@ class Game extends EventEmitter {
     /**
      * Prompts a player to click a card
      * @param {Player} player
-     * @param {Object} properties - see selectcardprompt.js
+     * @param {import('./gameSteps/PromptInterfaces.js').ISelectCardPromptProperties} properties - see selectcardprompt.js
      */
     promptForSelect(player, properties) {
         Contract.assertNotNullLike(player);
@@ -665,17 +729,33 @@ class Game extends EventEmitter {
     /**
      * This function is called by the client whenever a player clicks a button
      * in a prompt
-     * @param {String} playerName
+     * @param {String} playerId
      * @param {String} arg - arg property of the button clicked
      * @param {String} uuid - unique identifier of the prompt clicked
      * @param {String} method - method property of the button clicked
      * @returns {Boolean} this indicates to the server whether the received input is legal or not
      */
-    menuButton(playerName, arg, uuid, method) {
-        var player = this.getPlayerByName(playerName);
+    menuButton(playerId, arg, uuid, method) {
+        var player = this.getPlayerById(playerId);
 
         // check to see if the current step in the pipeline is waiting for input
         return this.pipeline.handleMenuCommand(player, arg, uuid, method);
+    }
+
+    /**
+     * This function is called by the client whenever a player clicks a "per card" button
+     * in a prompt (e.g. Inferno Four prompt). See {@link DisplayCardsWithButtonsPrompt}.
+     * @param {String} playerId
+     * @param {String} arg - arg property of the button clicked
+     * @param {String} uuid - unique identifier of the prompt clicked
+     * @param {String} method - method property of the button clicked
+     * @returns {Boolean} this indicates to the server whether the received input is legal or not
+     */
+    perCardMenuButton(playerId, arg, cardUuid, uuid, method) {
+        var player = this.getPlayerById(playerId);
+
+        // check to see if the current step in the pipeline is waiting for input
+        return this.pipeline.handlePerCardMenuCommand(player, arg, cardUuid, uuid, method);
     }
 
     /**
@@ -685,8 +765,8 @@ class Game extends EventEmitter {
      * @param {import('./gameSteps/PromptInterfaces.js').IDistributeAmongTargetsPromptResults} result
      * @param {String} uuid - unique identifier of the prompt clicked
      */
-    statefulPromptResults(playerName, result, uuid) {
-        var player = this.getPlayerByName(playerName);
+    statefulPromptResults(playerId, result, uuid) {
+        var player = this.getPlayerById(playerId);
 
         // check to see if the current step in the pipeline is waiting for input
         return this.pipeline.handleStatefulPromptResults(player, result, uuid);
@@ -695,13 +775,13 @@ class Game extends EventEmitter {
     /**
      * This function is called by the client when a player clicks an action window
      * toggle in the settings menu
-     * @param {String} playerName
+     * @param {String} playerId
      * @param {String} windowName - the name of the action window being toggled
      * @param {Boolean} toggle - the new setting of the toggle
      * @returns {undefined}
      */
-    togglePromptedActionWindow(playerName, windowName, toggle) {
-        var player = this.getPlayerByName(playerName);
+    togglePromptedActionWindow(playerId, windowName, toggle) {
+        var player = this.getPlayerById(playerId);
         if (!player) {
             return;
         }
@@ -712,13 +792,13 @@ class Game extends EventEmitter {
     /**
      * This function is called by the client when a player clicks an timer setting
      * toggle in the settings menu
-     * @param {String} playerName
+     * @param {String} playerId
      * @param {String} settingName - the name of the setting being toggled
      * @param {Boolean} toggle - the new setting of the toggle
      * @returns {undefined}
      */
-    toggleTimerSetting(playerName, settingName, toggle) {
-        var player = this.getPlayerByName(playerName);
+    toggleTimerSetting(playerId, settingName, toggle) {
+        var player = this.getPlayerByName(playerId);
         if (!player) {
             return;
         }
@@ -734,8 +814,8 @@ class Game extends EventEmitter {
      * @param {Boolean} toggle - the new setting of the toggle
      * @returns {undefined}
      */
-    toggleOptionSetting(playerName, settingName, toggle) {
-        var player = this.getPlayerByName(playerName);
+    toggleOptionSetting(playerId, settingName, toggle) {
+        var player = this.getPlayerById(playerId);
         if (!player) {
             return;
         }
@@ -887,13 +967,6 @@ class Game extends EventEmitter {
         let resolver = new AbilityResolver(this, context);
         this.queueStep(resolver);
         return resolver;
-    }
-
-    openSimultaneousEffectWindow(choices) {
-        throw new Error('Simultaneous effects not implemented yet');
-        // let window = new SimultaneousEffectWindow(this);
-        // choices.forEach((choice) => window.addToWindow(choice));
-        // this.queueStep(window);
     }
 
     /**
@@ -1161,6 +1234,11 @@ class Game extends EventEmitter {
         }
         this.movedCards = [];
 
+        if (events.length > 0) {
+            // check for any delayed effects which need to fire
+            this.ongoingEffectEngine.checkDelayedEffects(events);
+        }
+
         // check for a game state change (recalculating attack stats if necessary)
         if (
             // (!this.currentAttack && this.ongoingEffectEngine.resolveEffects(hasChanged)) ||
@@ -1171,10 +1249,6 @@ class Game extends EventEmitter {
 
             // - any defeated units
             this.findAnyCardsInPlay((card) => card.isUnit()).forEach((card) => card.checkDefeatedByOngoingEffect());
-        }
-        if (events.length > 0) {
-            // check for any delayed effects which need to fire
-            this.ongoingEffectEngine.checkDelayedEffects(events);
         }
     }
 
@@ -1187,11 +1261,8 @@ class Game extends EventEmitter {
      * @param {*} tokenCardsData object in the form `{ tokenName: tokenCardData }`
      */
     initialiseTokens(tokenCardsData) {
-        for (const tokenName of Object.values(TokenName)) {
-            if (!(tokenName in tokenCardsData)) {
-                throw new Error(`Token type '${tokenName}' was not included in token data for game initialization`);
-            }
-        }
+        this.checkTokenDataProvided(TokenUpgradeName, tokenCardsData);
+        this.checkTokenDataProvided(TokenUnitName, tokenCardsData);
 
         this.tokenFactories = {};
 
@@ -1202,12 +1273,20 @@ class Game extends EventEmitter {
         }
     }
 
+    checkTokenDataProvided(tokenTypeNames, tokenCardsData) {
+        for (const tokenName of Object.values(tokenTypeNames)) {
+            if (!(tokenName in tokenCardsData)) {
+                throw new Error(`Token type '${tokenName}' was not included in token data for game initialization`);
+            }
+        }
+    }
+
     /**
-     * Creates a new shield token in an out of play zone owned by the player and
+     * Creates a new token in an out of play zone owned by the player and
      * adds it to all relevant card lists
      * @param {Player} player
-     * @param {TokenName} tokenName
-     * @returns {Shield}
+     * @param {import('./Constants.js').TokenName} tokenName
+     * @returns {Card}
      */
     generateToken(player, tokenName) {
         const token = this.tokenFactories[tokenName](player);
@@ -1326,13 +1405,13 @@ class Game extends EventEmitter {
     // /*
     //  * This information is sent to the client
     //  */
-    getState(notInactivePlayerName) {
-        let activePlayer = this.playersAndSpectators[notInactivePlayerName] || new AnonymousSpectator();
+    getState(notInactivePlayerId) {
+        let activePlayer = this.playersAndSpectators[notInactivePlayerId] || new AnonymousSpectator();
         let playerState = {};
         let { blocklist, email, emailHash, promptedActionWindows, settings, ...simplifiedOwner } = this.owner;
         if (this.started) {
             for (const player of this.getPlayers()) {
-                playerState[player.name] = player.getState(activePlayer);
+                playerState[player.id] = player.getState(activePlayer);
             }
 
             return {
@@ -1344,6 +1423,7 @@ class Game extends EventEmitter {
                 players: playerState,
                 phase: this.currentPhase,
                 messages: this.gameChat.messages,
+                clientUIProperties: this.clientUIProperties,
                 spectators: this.getSpectators().map((spectator) => {
                     return {
                         id: spectator.id,
@@ -1352,7 +1432,7 @@ class Game extends EventEmitter {
                 }),
                 started: this.started,
                 gameMode: this.gameMode,
-                // winner: this.winner ? this.winner.user.name : undefined
+                winner: this.winner ? this.winner : undefined, // TODO comment once we clarify how to display endgame screen
             };
         }
         return {};

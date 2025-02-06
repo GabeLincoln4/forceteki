@@ -1,18 +1,19 @@
 const fs = require('fs');
 const path = require('path');
 const TestSetupError = require('./TestSetupError.js');
+const Util = require('./Util.js');
 
 // defaults to fill in with if not explicitly provided by the test case
 const defaultLeader = { 1: 'darth-vader#dark-lord-of-the-sith', 2: 'luke-skywalker#faithful-friend' };
 const defaultBase = { 1: 'kestro-city', 2: 'administrators-tower' };
-const playerCardProperties = ['groundArena', 'spaceArena', 'hand', 'resources', 'deck', 'discard', 'leader', 'base'];
+const playerCardProperties = ['groundArena', 'spaceArena', 'hand', 'resources', 'deck', 'discard', 'leader', 'base', 'opponentAttachedUpgrades'];
 const deckFillerCard = 'underworld-thug';
 const defaultResourceCount = 20;
 const defaultDeckSize = 8; // buffer decks to prevent re-shuffling
 
 class DeckBuilder {
     constructor() {
-        this.cards = this.loadCards('test/json/Card');
+        this.cards = this.loadCards('test/json');
     }
 
     loadCards(directory) {
@@ -22,7 +23,23 @@ class DeckBuilder {
             throw new TestSetupError(`Json card definitions folder ${directory} not found, please run 'npm run get-cards'`);
         }
 
-        var jsonCards = fs.readdirSync(directory).filter((file) => file.endsWith('.json'));
+        const actualCardDataVersionPath = path.join(directory, 'card-data-version.txt');
+        if (!fs.existsSync(actualCardDataVersionPath)) {
+            throw new TestSetupError(`Card data version file ${actualCardDataVersionPath} not found, please run 'npm run get-cards'`);
+        }
+
+        const expectedCardDataVersionPath = path.join(__dirname, '../../../card-data-version.txt');
+        if (!fs.existsSync(expectedCardDataVersionPath)) {
+            throw new TestSetupError(`Repository file ${expectedCardDataVersionPath} not found`);
+        }
+
+        const actualCardDataVersion = fs.readFileSync(actualCardDataVersionPath, 'utf8');
+        const expectedCardDataVersion = fs.readFileSync(expectedCardDataVersionPath, 'utf8');
+        if (actualCardDataVersion !== expectedCardDataVersion) {
+            throw new TestSetupError(`Json card data version mismatch, expected '${expectedCardDataVersion}' but found '${actualCardDataVersion}' currently installed. Please run 'npm run get-cards'`);
+        }
+
+        var jsonCards = fs.readdirSync(path.join(directory, '/Card')).filter((file) => file.endsWith('.json'));
         jsonCards.forEach((cardPath) => {
             var card = require(path.join('../json/Card', cardPath))[0];
             cards[card.id] = card;
@@ -33,6 +50,65 @@ class DeckBuilder {
         }
 
         return cards;
+    }
+
+    getOwnedCards(playerNumber, playerOptions, oppOptions, arena = 'anyArena') {
+        let { groundArena, spaceArena, ...playerCards } = playerOptions;
+
+        let opponentAttachedUpgrades = [];
+
+        if ((arena === 'groundArena' || arena === 'anyArena') && playerOptions.groundArena) {
+            if (playerOptions.groundArena.some((card) => card.hasOwnProperty('ownerAndController'))) {
+                throw new TestSetupError('Do not use the \'ownerAndController\' property on units, use \'owner\' instead');
+            }
+
+            const playerControlled = playerOptions.groundArena.filter((card) => !card.hasOwnProperty('owner') && !card.owner?.endsWith(playerNumber));
+            const oppControlled = oppOptions.groundArena?.filter((card) => card.hasOwnProperty('owner') && card.owner?.endsWith(playerNumber));
+            playerCards.groundArena = (playerControlled || []).concat((oppControlled || []));
+
+            opponentAttachedUpgrades = opponentAttachedUpgrades.concat(this.getOpponentAttachedUpgrades(playerOptions.groundArena, playerNumber, oppOptions.groundArena, playerCards));
+        }
+        if ((arena === 'spaceArena' || arena === 'anyArena') && playerOptions.spaceArena) {
+            if (playerOptions.spaceArena.some((card) => card.hasOwnProperty('ownerAndController'))) {
+                throw new TestSetupError('Do not use the \'ownerAndController\' property on units, use \'owner\' instead');
+            }
+
+            const playerControlled = playerOptions.spaceArena.filter((card) => !card.hasOwnProperty('owner') && !card.owner?.endsWith(playerNumber));
+            const oppControlled = oppOptions.spaceArena?.filter((card) => card.hasOwnProperty('owner') && card.owner?.endsWith(playerNumber));
+            playerCards.spaceArena = (playerControlled || []).concat((oppControlled || []));
+
+            opponentAttachedUpgrades = opponentAttachedUpgrades.concat(this.getOpponentAttachedUpgrades(playerOptions.spaceArena, playerNumber, oppOptions.spaceArena, playerCards));
+        }
+
+        playerCards.opponentAttachedUpgrades = opponentAttachedUpgrades;
+
+        return playerCards;
+    }
+
+    getOpponentAttachedUpgrades(arena, playerNumber, oppArena, playerCards) {
+        let opponentAttachedUpgrades = [];
+
+        oppArena?.forEach((card) => {
+            if (typeof card !== 'string' && card.hasOwnProperty('upgrades')) {
+                for (const upgrade of card.upgrades) {
+                    if (typeof upgrade !== 'string') {
+                        if (upgrade.hasOwnProperty('owner')) {
+                            throw new TestSetupError('Do not use the \'owner\' property on upgrades, use \'ownerAndController\' instead');
+                        }
+
+                        if (upgrade.hasOwnProperty('ownerAndController') && upgrade.ownerAndController.endsWith(playerNumber)) {
+                            let oppUpgrade = { attachedTo: card.card, ...upgrade };
+                            if (card.hasOwnProperty('ownerAndController')) {
+                                oppUpgrade.attachedToOwner = card.ownerAndController;
+                            }
+                            opponentAttachedUpgrades = opponentAttachedUpgrades.concat(oppUpgrade);
+                            card.upgrades.splice(card.upgrades.indexOf(upgrade), 1);
+                        }
+                    }
+                }
+            }
+        });
+        return opponentAttachedUpgrades;
     }
 
     customDeck(playerNumber, playerCards = {}, phase) {
@@ -47,6 +123,7 @@ class DeckBuilder {
         let inPlayCards = [];
 
         const namedCards = this.getAllNamedCards(playerCards);
+        let resources = [];
 
         allCards.push(this.getLeaderCard(playerCards, playerNumber));
         allCards.push(this.getBaseCard(playerCards, playerNumber));
@@ -54,14 +131,17 @@ class DeckBuilder {
         // if user didn't provide explicit resource cards, create default ones to be added to deck
         // if the phase is setup the playerCards.resources becomes []
         if (phase !== 'setup') {
-            playerCards.resources = this.padCardListIfNeeded(playerCards.resources, defaultResourceCount);
+            resources = this.padCardListIfNeeded(playerCards.resources, defaultResourceCount);
         } else {
-            playerCards.resources = [];
+            resources = [];
         }
         playerCards.deck = this.padCardListIfNeeded(playerCards.deck, defaultDeckSize);
 
-        allCards.push(...playerCards.resources);
+        allCards.push(...resources);
         allCards.push(...playerCards.deck);
+        playerCards.opponentAttachedUpgrades.forEach((card) => {
+            allCards.push(card.card);
+        });
 
         /**
          * Create the deck from cards in test - deck consists of cards in decks,
@@ -81,7 +161,7 @@ class DeckBuilder {
         // Collect all the cards together
         allCards = allCards.concat(inPlayCards);
 
-        return [this.buildDeck(allCards), namedCards];
+        return [this.buildDeck(allCards), namedCards, resources, playerCards.deck];
     }
 
     getAllNamedCards(playerObject) {
@@ -113,7 +193,9 @@ class DeckBuilder {
             playerEntry.forEach((card) => namedCards = namedCards.concat(this.getNamedCardsInPlayerEntry(card)));
         } else if ('card' in playerEntry) {
             namedCards.push(playerEntry.card);
-            namedCards = namedCards.concat(this.getUpgradesFromCard(playerEntry));
+            if (playerEntry.hasOwnProperty('upgrades')) {
+                namedCards = namedCards.concat(this.getUpgradesFromCard(playerEntry));
+            }
         } else {
             throw new TestSetupError(`Unknown test card specifier format: '${playerEntry}'`);
         }
@@ -178,17 +260,26 @@ class DeckBuilder {
         let inPlayCards = [];
         for (const card of arenaList) {
             if (typeof card === 'string') {
-                inPlayCards.push(card);
+                if (!Util.isTokenUnit(card)) {
+                    inPlayCards.push(card);
+                }
             } else {
-                // Add the card itself
-                inPlayCards.push(card.card);
+                // Add the card itself, if not a token
+                if (!Util.isTokenUnit(card.card)) {
+                    inPlayCards.push(card.card);
+                }
+
                 // Add any upgrades
                 if (card.upgrades) {
-                    let nonTokenUpgrades = card.upgrades.filter((upgrade) =>
-                        !['shield', 'experience'].includes(upgrade)
-                    );
+                    const nonTokenUpgrades = card.upgrades.filter((upgrade) => !Util.isTokenUpgrade(upgrade));
 
-                    inPlayCards.push(...nonTokenUpgrades);
+                    for (const upgrade of nonTokenUpgrades) {
+                        if (typeof upgrade === 'string') {
+                            inPlayCards.push(upgrade);
+                        } else {
+                            inPlayCards.push(upgrade.card);
+                        }
+                    }
                 }
             }
         }
@@ -219,8 +310,12 @@ class DeckBuilder {
 
     getTokenData() {
         return {
+            battleDroid: this.getCard('battle-droid'),
+            cloneTrooper: this.getCard('clone-trooper'),
+            tieFighter: this.getCard('tie-fighter'),
+            xwing: this.getCard('xwing'),
+            experience: this.getCard('experience'),
             shield: this.getCard('shield'),
-            experience: this.getCard('experience')
         };
     }
 

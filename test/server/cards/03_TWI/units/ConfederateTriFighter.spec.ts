@@ -15,7 +15,10 @@ describe('Confederate Tri-Fighter', function () {
                         groundArena: ['yoda#old-master'],
                         spaceArena: ['corellian-freighter'],
                         base: { card: 'capital-city', damage: 5 }
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
 
                 const { context } = contextRef;
@@ -45,8 +48,6 @@ describe('Confederate Tri-Fighter', function () {
 
                 // play repair
                 context.player1.clickCard(context.repair);
-                expect(context.player1).toBeAbleToSelectExactly([context.p1Base, context.p2Base, context.admiralAckbar, context.yoda, context.confederateTrifighter, context.corellianFreighter]);
-                context.player1.clickCard(context.p1Base);
                 expect(context.player2).toBeActivePlayer();
                 expect(context.p1Base.damage).toBe(5);
 

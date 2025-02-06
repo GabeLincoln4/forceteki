@@ -1,5 +1,5 @@
 import AbilityHelper from '../../../AbilityHelper';
-import { Attack } from '../../../core/attack/Attack';
+import type { Attack } from '../../../core/attack/Attack';
 import { EventCard } from '../../../core/card/EventCard';
 import { Trait } from '../../../core/Constants';
 
@@ -35,5 +35,3 @@ export default class Headhunting extends EventCard {
         });
     }
 }
-
-Headhunting.implemented = true;

@@ -1,5 +1,5 @@
 import AbilityHelper from '../../../AbilityHelper';
-import { Card } from '../../../core/card/Card';
+import type { Card } from '../../../core/card/Card';
 import { UpgradeCard } from '../../../core/card/UpgradeCard';
 import { Trait } from '../../../core/Constants';
 
@@ -22,5 +22,3 @@ export default class VambraceGrappleshot extends UpgradeCard {
         });
     }
 }
-
-VambraceGrappleshot.implemented = true;

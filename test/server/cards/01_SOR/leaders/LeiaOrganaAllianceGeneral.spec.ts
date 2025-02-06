@@ -12,7 +12,10 @@ describe('Leia Organa, Alliance General', function() {
                     player2: {
                         groundArena: ['sundari-peacekeeper'],
                         spaceArena: ['tie-advanced']
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
             });
 
@@ -57,7 +60,7 @@ describe('Leia Organa, Alliance General', function() {
                 expect(context.player1).toBeActivePlayer();
                 expect(context.player1).toBeAbleToSelectExactly([context.sabineWren, context.fleetLieutenant, context.allianceXwing]);
                 expect(context.player1).toHavePassAbilityButton();
-                context.player1.clickPrompt('Pass ability');
+                context.player1.clickPrompt('Pass');
 
                 expect(context.player2).toBeActivePlayer();
                 expect(context.leiaOrgana.exhausted).toBe(true);
@@ -110,6 +113,7 @@ describe('Leia Organa, Alliance General', function() {
                 expect(context.sabineWren.damage).toBe(1);
                 expect(context.sundariPeacekeeper.damage).toBe(2);
                 expect(context.player1).toBeAbleToSelectExactly([context.sundariPeacekeeper, context.p1Base, context.p2Base]);
+                context.player1.clickCard(context.p2Base);
             });
         });
 
@@ -125,7 +129,10 @@ describe('Leia Organa, Alliance General', function() {
                     player2: {
                         groundArena: ['sundari-peacekeeper'],
                         spaceArena: ['tie-advanced']
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
             });
 
@@ -150,7 +157,10 @@ describe('Leia Organa, Alliance General', function() {
                     player2: {
                         groundArena: ['sundari-peacekeeper'],
                         spaceArena: ['cartel-spacer']
-                    }
+                    },
+
+                    // IMPORTANT: this is here for backwards compatibility of older tests, don't use in new code
+                    autoSingleTarget: true
                 });
             });
 

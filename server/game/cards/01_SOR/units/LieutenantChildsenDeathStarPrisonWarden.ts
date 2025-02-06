@@ -3,6 +3,8 @@ import { NonLeaderUnitCard } from '../../../core/card/NonLeaderUnitCard';
 import { Aspect, RelativePlayer, ZoneName, TargetMode } from '../../../core/Constants';
 
 export default class LieutenantChildsenDeathStarPrisonWarden extends NonLeaderUnitCard {
+    protected override readonly overrideNotImplemented: boolean = true;
+
     protected override getImplementationId() {
         return {
             id: '2855740390',
@@ -19,17 +21,17 @@ export default class LieutenantChildsenDeathStarPrisonWarden extends NonLeaderUn
                 controller: RelativePlayer.Self,
                 zoneFilter: ZoneName.Hand,
                 cardCondition: (card) => card.hasSomeAspect(Aspect.Vigilance),
-                immediateEffect: AbilityHelper.immediateEffects.reveal(),
+                immediateEffect: AbilityHelper.immediateEffects.reveal({
+                    useDisplayPrompt: true,
+                    promptedPlayer: RelativePlayer.Opponent
+                }),
             },
-            then: (thenContext) => ({
+            ifYouDo: (ifYouDoContext) => ({
                 title: 'For each card revealed this way, give an Experience token to this unit',
-                thenCondition: () => thenContext.target.length > 0,
                 effect: 'gain {1} experience',
-                effectArgs: [thenContext.target.length],
-                immediateEffect: AbilityHelper.immediateEffects.giveExperience({ amount: thenContext.target.length }),
+                effectArgs: [ifYouDoContext.target.length],
+                immediateEffect: AbilityHelper.immediateEffects.giveExperience({ amount: ifYouDoContext.target.length }),
             })
         });
     }
 }
-
-LieutenantChildsenDeathStarPrisonWarden.implemented = true;

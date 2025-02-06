@@ -1,7 +1,9 @@
 const { UiPrompt } = require('./prompts/UiPrompt.js');
-const { RelativePlayer, WildcardZoneName } = require('../Constants.js');
+const { RelativePlayer, WildcardZoneName, PromptType } = require('../Constants.js');
 const EnumHelpers = require('../utils/EnumHelpers.js');
 const Contract = require('../utils/Contract');
+const KeywordHelpers = require('../ability/KeywordHelpers.js');
+const { cardCannot } = require('../../ongoingEffects/CardCannot.js');
 
 class ActionWindow extends UiPrompt {
     constructor(game, title, windowName, prevPlayerPassed, setPassStatus, activePlayer = null) {
@@ -106,7 +108,8 @@ class ActionWindow extends UiPrompt {
             menuTitle: 'Choose an action',
             buttons: buttons,
             promptTitle: this.title,
-            promptUuid: this.uuid
+            promptUuid: this.uuid,
+            promptType: PromptType.ActionWindow
         };
     }
 
@@ -118,20 +121,20 @@ class ActionWindow extends UiPrompt {
     /** @override */
     menuCommand(player, choice) {
         switch (choice) {
-            case 'manual':
-                this.game.promptForSelect(this.activePlayer, {
-                    source: 'Manual Action',
-                    activePrompt: 'Which ability are you using?',
-                    zone: WildcardZoneName.Any,
-                    controller: RelativePlayer.Self,
-                    cardCondition: (card) => card.isFaceup() || card.canBeSmuggled(),
-                    onSelect: (player, card) => {
-                        this.game.addMessage('{0} uses {1}\'s ability', player, card);
-                        this.setPassStatus(false);
-                        return true;
-                    }
-                });
-                return true;
+            // case 'manual':
+            //     this.game.promptForSelect(this.activePlayer, {
+            //         source: 'Manual Action',
+            //         activePrompt: 'Which ability are you using?',
+            //         zone: WildcardZoneName.Any,
+            //         controller: RelativePlayer.Self,
+            //         cardCondition: (card) => card.isFaceup() || card.canBeSmuggled(),
+            //         onSelect: (player, card) => {
+            //             this.game.addMessage('{0} uses {1}\'s ability', player, card);
+            //             this.setPassStatus(false);
+            //             return true;
+            //         }
+            //     });
+            //     return true;
 
             case 'pass':
                 this.pass();
@@ -189,6 +192,7 @@ class ActionWindow extends UiPrompt {
         super.complete();
     }
 
+    /** @override */
     highlightSelectableCards() {
         const allPossibleCards = this.game.findAnyCardsInPlay().concat(
             this.activePlayer.discardZone.cards,
@@ -197,6 +201,7 @@ class ActionWindow extends UiPrompt {
             this.activePlayer.baseZone.cards
         );
         this.activePlayer.setSelectableCards(allPossibleCards.filter((card) => this.getCardLegalActions(card, this.activePlayer).length > 0));
+        this.activePlayer.opponent.setSelectableCards([]);
     }
 
     // IMPORTANT: the below code is referenced in the debugging guide (docs/debugging-guide.md). If you make changes here, make sure to update that document as well.

@@ -1,5 +1,5 @@
 import AbilityHelper from '../../../AbilityHelper';
-import { Card } from '../../../core/card/Card';
+import type { Card } from '../../../core/card/Card';
 import { UpgradeCard } from '../../../core/card/UpgradeCard';
 import { PlayType, Trait } from '../../../core/Constants';
 
@@ -27,5 +27,3 @@ export default class HotshotDL44Blaster extends UpgradeCard {
         });
     }
 }
-
-HotshotDL44Blaster.implemented = true;

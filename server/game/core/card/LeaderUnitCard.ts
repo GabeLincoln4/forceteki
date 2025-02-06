@@ -1,18 +1,23 @@
-import Player from '../Player';
+import type Player from '../Player';
 import { LeaderCard } from './LeaderCard';
-import { CardType, ZoneName, ZoneFilter } from '../Constants';
+import type { ZoneFilter } from '../Constants';
+import { CardType, ZoneName } from '../Constants';
 import { WithCost } from './propertyMixins/Cost';
 import { WithUnitProperties } from './propertyMixins/UnitProperties';
 import type { UnitCard } from './CardTypes';
 import * as EnumHelpers from '../utils/EnumHelpers';
-import { IActionAbilityProps, IConstantAbilityProps, IReplacementEffectAbilityProps, ITriggeredAbilityProps } from '../../Interfaces';
+import type { IActionAbilityProps, IConstantAbilityProps, IReplacementEffectAbilityProps, ITriggeredAbilityProps } from '../../Interfaces';
 import * as Helpers from '../utils/Helpers';
-import AbilityHelper from '../../AbilityHelper';
 import * as Contract from '../utils/Contract';
+import { EpicActionLimit } from '../ability/AbilityLimit';
+import { DeployLeaderSystem } from '../../gameSystems/DeployLeaderSystem';
+import type { ActionAbility } from '../ability/ActionAbility';
 
 const LeaderUnitCardParent = WithUnitProperties(WithCost(LeaderCard));
 
 export class LeaderUnitCard extends LeaderUnitCardParent {
+    private readonly epicActionAbility: ActionAbility;
+
     public override get type() {
         return this._deployed ? CardType.LeaderUnit : CardType.Leader;
     }
@@ -21,15 +26,15 @@ export class LeaderUnitCard extends LeaderUnitCardParent {
         super(owner, cardData);
 
         this.setupLeaderUnitSide = true;
-        this.setupLeaderUnitSideAbilities();
+        this.setupLeaderUnitSideAbilities(this);
 
         // add deploy leader action
-        this.addActionAbility({
+        this.epicActionAbility = this.addActionAbility({
             title: `Deploy ${this.title}`,
-            limit: AbilityHelper.limit.epicAction(),
+            limit: new EpicActionLimit(),
             condition: (context) => context.source.controller.resources.length >= context.source.cost,
             zoneFilter: ZoneName.Base,
-            immediateEffect: AbilityHelper.immediateEffects.deploy()
+            immediateEffect: new DeployLeaderSystem({})
         });
     }
 
@@ -69,27 +74,27 @@ export class LeaderUnitCard extends LeaderUnitCardParent {
      * Create card abilities for the leader unit side by calling subsequent methods with appropriate properties
      */
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    protected setupLeaderUnitSideAbilities() {
+    protected setupLeaderUnitSideAbilities(sourceCard: this) {
     }
 
     protected override addActionAbility(properties: IActionAbilityProps<this>) {
         properties.zoneFilter = this.getAbilityZonesForSide(properties.zoneFilter);
-        super.addActionAbility(properties);
+        return super.addActionAbility(properties);
     }
 
-    protected override addConstantAbility(properties: IConstantAbilityProps<this>): void {
+    protected override addConstantAbility(properties: IConstantAbilityProps<this>) {
         properties.sourceZoneFilter = this.getAbilityZonesForSide(properties.sourceZoneFilter);
-        super.addConstantAbility(properties);
+        return super.addConstantAbility(properties);
     }
 
-    protected override addReplacementEffectAbility(properties: IReplacementEffectAbilityProps<this>): void {
+    protected override addReplacementEffectAbility(properties: IReplacementEffectAbilityProps<this>) {
         properties.zoneFilter = this.getAbilityZonesForSide(properties.zoneFilter);
-        super.addReplacementEffectAbility(properties);
+        return super.addReplacementEffectAbility(properties);
     }
 
-    protected override addTriggeredAbility(properties: ITriggeredAbilityProps<this>): void {
+    protected override addTriggeredAbility(properties: ITriggeredAbilityProps<this>) {
         properties.zoneFilter = this.getAbilityZonesForSide(properties.zoneFilter);
-        super.addTriggeredAbility(properties);
+        return super.addTriggeredAbility(properties);
     }
 
     /** Generates the right zoneFilter property depending on which leader side we're setting up */
@@ -124,5 +129,12 @@ export class LeaderUnitCard extends LeaderUnitCardParent {
                 this.setCaptureZoneEnabled(false);
                 break;
         }
+    }
+
+    public override getSummary(activePlayer: Player) {
+        return {
+            ...super.getSummary(activePlayer),
+            epicActionSpent: this.epicActionAbility.limit.isAtMax(this.owner)
+        };
     }
 }

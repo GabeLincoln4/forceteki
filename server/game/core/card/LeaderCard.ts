@@ -1,7 +1,8 @@
-import Player from '../Player';
+import type Player from '../Player';
 import { InPlayCard } from './baseClasses/InPlayCard';
 import * as Contract from '../utils/Contract';
-import { CardType, MoveZoneDestination, ZoneName } from '../Constants';
+import type { ZoneName } from '../Constants';
+import { CardType } from '../Constants';
 
 export class LeaderCard extends InPlayCard {
     protected _deployed = false;
@@ -16,9 +17,8 @@ export class LeaderCard extends InPlayCard {
         super(owner, cardData);
         Contract.assertEqual(this.printedType, CardType.Leader);
 
-        this.hasImplementationFile = true;
         this.setupLeaderUnitSide = false;
-        this.setupLeaderSideAbilities();
+        this.setupLeaderSideAbilities(this);
     }
 
     public override isLeader(): this is LeaderCard {
@@ -32,8 +32,12 @@ export class LeaderCard extends InPlayCard {
     /**
      * Create card abilities for the leader (non-unit) side by calling subsequent methods with appropriate properties
      */
-    protected setupLeaderSideAbilities() {
-        this.hasImplementationFile = false;
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    protected setupLeaderSideAbilities(sourceCard: this) { }
+
+    // TODO TYPE REFACTOR: separate out the Leader types from the playable types
+    public override getPlayCardActions() {
+        return [];
     }
 
     // TODO TYPE REFACTOR: leaders shouldn't have the takeControl method

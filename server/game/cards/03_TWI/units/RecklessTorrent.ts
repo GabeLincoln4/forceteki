@@ -1,6 +1,6 @@
 import AbilityHelper from '../../../AbilityHelper';
 import { NonLeaderUnitCard } from '../../../core/card/NonLeaderUnitCard';
-import { AbilityType, RelativePlayer, WildcardCardType, ZoneName } from '../../../core/Constants';
+import { AbilityType, RelativePlayer, WildcardCardType } from '../../../core/Constants';
 
 export default class RecklessTorrent extends NonLeaderUnitCard {
     protected override getImplementationId () {
@@ -37,5 +37,3 @@ export default class RecklessTorrent extends NonLeaderUnitCard {
         });
     }
 }
-
-RecklessTorrent.implemented = true;

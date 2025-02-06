@@ -1,5 +1,4 @@
 import AbilityHelper from '../../../AbilityHelper';
-import { UnitCard } from '../../../core/card/CardTypes';
 import { EventCard } from '../../../core/card/EventCard';
 import { RelativePlayer, WildcardZoneName } from '../../../core/Constants';
 
@@ -29,5 +28,3 @@ export default class AsteroidSanctuary extends EventCard {
         });
     }
 }
-
-AsteroidSanctuary.implemented = true;

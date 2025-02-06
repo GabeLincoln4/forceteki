@@ -1,9 +1,10 @@
-import { Card } from '../../card/Card';
+import type { Card } from '../../card/Card';
 import type Game from '../../Game';
 import type Player from '../../Player';
-import { IPlayerPromptStateProperties } from '../../PlayerPromptState';
+import type { IPlayerPromptStateProperties } from '../../PlayerPromptState';
 import * as Contract from '../../utils/Contract';
 import { AllPlayerPrompt } from './AllPlayerPrompt';
+import { PromptType } from '../../Constants';
 
 export class ResourcePrompt extends AllPlayerPrompt {
     protected selectedCards = new Map<string, Card[]>();
@@ -35,7 +36,7 @@ export class ResourcePrompt extends AllPlayerPrompt {
         return super.continue();
     }
 
-    public highlightSelectableCards() {
+    protected override highlightSelectableCards() {
         this.game.getPlayers().forEach((player) => {
             // cards are only selectable until we've selected as many as allowed
             if (!this.selectableCards[player.name] && !this.completionCondition(player)) {
@@ -60,7 +61,8 @@ export class ResourcePrompt extends AllPlayerPrompt {
             menuTitle: promptText,
             buttons: [{ text: 'Done', arg: 'done' }],
             promptTitle: 'Resource Step',
-            promptUuid: this.uuid
+            promptUuid: this.uuid,
+            promptType: PromptType.Resource
         };
     }
 
@@ -69,13 +71,16 @@ export class ResourcePrompt extends AllPlayerPrompt {
         Contract.assertNotNullLike(card);
 
         if (
-            !this.activeCondition(player) || !player.handZone.hasCard(card) ||
-            this.selectedCards[player.name].length === this.nCardsToResource
+            !this.activeCondition(player) || !player.handZone.hasCard(card)
         ) {
             return false;
         }
 
         if (!this.selectedCards[player.name].includes(card)) {
+            if (this.selectedCards[player.name].length === this.nCardsToResource) {
+                return false;
+            }
+
             this.selectedCards[player.name].push(card);
         } else {
             this.selectedCards[player.name] = this.selectedCards[player.name].filter((c) => c !== card);
@@ -119,11 +124,6 @@ export class ResourcePrompt extends AllPlayerPrompt {
 
     public override complete() {
         this.game.getPlayers().forEach((player) => this.resourceSelectedCards(player));
-
-        for (const player of this.game.getPlayers()) {
-            player.clearSelectedCards();
-            player.clearSelectableCards();
-        }
 
         return super.complete();
     }
